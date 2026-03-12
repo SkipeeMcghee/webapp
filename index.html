@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.1";
+    window.APP_VERSION = "1.0.2";
   </script>
   <style>
     :root {
@@ -268,6 +268,13 @@
       font-size: 0.86rem;
       line-height: 1.35;
     }
+
+    .grade-s { background: #f3e8ff; color: #6b21a8; }
+    .grade-a { background: #e0e7ff; color: #3730a3; }
+    .grade-b { background: #dbeafe; color: #1d4ed8; }
+    .grade-c { background: #dcfce7; color: #166534; }
+    .grade-d { background: #fef9c3; color: #854d0e; }
+    .grade-f { background: #fee2e2; color: #991b1b; }
 
     @media (max-width: 980px) {
       .uploader-grid { grid-template-columns: 1fr; }
@@ -1088,17 +1095,27 @@
     }
 
     function renderTable(rows) {
+      const gradeClass = (grade) => {
+        const g = String(grade || "").toUpperCase();
+        if (g === "S") return "grade-s";
+        if (g === "A") return "grade-a";
+        if (g === "B") return "grade-b";
+        if (g === "C") return "grade-c";
+        if (g === "D") return "grade-d";
+        return "grade-f";
+      };
+
       scoresBody.innerHTML = rows.map((row) => `
         <tr>
           <td><strong>${escapeHtml(row.unit)}</strong></td>
           <td>${escapeHtml(row.role)}</td>
-          <td>${row.combat.toFixed(1)} (${escapeHtml(row.combatGrade)})</td>
-          <td>${row.durability.toFixed(1)} (${escapeHtml(row.durabilityGrade)})</td>
-          <td>${row.threat.toFixed(1)} (${escapeHtml(row.threatGrade)})</td>
-          <td>${row.endurance.toFixed(1)} (${escapeHtml(row.enduranceGrade)})</td>
-          <td>${row.vision.toFixed(1)} (${escapeHtml(row.visionGrade)})</td>
-          <td>${row.utility.toFixed(1)} (${escapeHtml(row.utilityGrade)})</td>
-          <td><strong>${row.total.toFixed(1)} (${escapeHtml(row.totalGrade)})</strong></td>
+          <td class="${gradeClass(row.combatGrade)}">${row.combat.toFixed(1)} (${escapeHtml(row.combatGrade)})</td>
+          <td class="${gradeClass(row.durabilityGrade)}">${row.durability.toFixed(1)} (${escapeHtml(row.durabilityGrade)})</td>
+          <td class="${gradeClass(row.threatGrade)}">${row.threat.toFixed(1)} (${escapeHtml(row.threatGrade)})</td>
+          <td class="${gradeClass(row.enduranceGrade)}">${row.endurance.toFixed(1)} (${escapeHtml(row.enduranceGrade)})</td>
+          <td class="${gradeClass(row.visionGrade)}">${row.vision.toFixed(1)} (${escapeHtml(row.visionGrade)})</td>
+          <td class="${gradeClass(row.utilityGrade)}">${row.utility.toFixed(1)} (${escapeHtml(row.utilityGrade)})</td>
+          <td class="${gradeClass(row.totalGrade)}"><strong>${row.total.toFixed(1)} (${escapeHtml(row.totalGrade)})</strong></td>
         </tr>
       `).join("");
     }
