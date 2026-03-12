@@ -303,11 +303,11 @@
       </article>
     </section>
 
-    <section id="simSection" class="card" style="display: none;">
+    <section id="simSection" class="card">
       <h2 style="margin: 0 0 10px; font-size: 1.05rem;">Single Altercation Simulator</h2>
       <p class="small-note" style="margin: 0 0 12px;">
-        Uses best-weapon damage from the matrix and best-weapon range bands from Units.csv. If defender range does not cover
-        attack distance, no counterattack occurs.
+        Uses best-weapon damage from the matrix and best-weapon range bands from Units.csv. Base damage assumes 100 HP,
+        then scales by current HP. Damage is rounded up. Luck is 0% to +9%, applied after firepower modifiers and scaled by current HP.
       </p>
       <div class="sim-grid">
         <div class="field">
@@ -323,10 +323,35 @@
           <input id="simDistance" type="number" min="1" step="1" placeholder="auto" />
         </div>
         <div class="field">
+          <label for="simLuckMode">Luck</label>
+          <select id="simLuckMode">
+            <option value="min">Min (0%)</option>
+            <option value="avg" selected>Average (4.5%)</option>
+            <option value="max">Max (9%)</option>
+            <option value="random">Random (0-9%)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="simAttackerHp">Attacker HP</label>
+          <input id="simAttackerHp" type="number" min="1" max="100" step="1" value="100" />
+        </div>
+        <div class="field">
+          <label for="simDefenderHp">Defender HP</label>
+          <input id="simDefenderHp" type="number" min="1" max="100" step="1" value="100" />
+        </div>
+        <div class="field">
+          <label for="simAttackerFirepower">Attacker Firepower %</label>
+          <input id="simAttackerFirepower" type="number" min="1" max="300" step="1" value="100" />
+        </div>
+        <div class="field">
+          <label for="simDefenderFirepower">Counter Firepower %</label>
+          <input id="simDefenderFirepower" type="number" min="1" max="300" step="1" value="100" />
+        </div>
+        <div class="field">
           <button id="simulateBtn" type="button">Simulate</button>
         </div>
       </div>
-      <div id="simOutput" class="sim-output">Run analysis first, then choose attacker and defender.</div>
+      <div id="simOutput" class="sim-output">Load CSV files and run analysis to enable simulator calculations.</div>
     </section>
   </main>
 
@@ -355,6 +380,11 @@
     const simAttacker = document.getElementById("simAttacker");
     const simDefender = document.getElementById("simDefender");
     const simDistance = document.getElementById("simDistance");
+    const simLuckMode = document.getElementById("simLuckMode");
+    const simAttackerHp = document.getElementById("simAttackerHp");
+    const simDefenderHp = document.getElementById("simDefenderHp");
+    const simAttackerFirepower = document.getElementById("simAttackerFirepower");
+    const simDefenderFirepower = document.getElementById("simDefenderFirepower");
     const simulateBtn = document.getElementById("simulateBtn");
     const simOutput = document.getElementById("simOutput");
 
@@ -1005,6 +1035,12 @@
         ? requestedDistance
         : autoDistanceFor(attacker);
 
+      const attackerHp = Math.max(1, Math.min(100, safeNumber(simAttackerHp.value, 100)));
+      const defenderHpStart = Math.max(1, Math.min(100, safeNumber(simDefenderHp.value, 100)));
+      const attackerFirepower = Math.max(1, safeNumber(simAttackerFirepower.value, 100));
+      const defenderFirepower = Math.max(1, safeNumber(simDefenderFirepower.value, 100));
+      const luckMode = simLuckMode.value || "avg";
+
       const attackerBand = { min: attacker.bestMinRange, max: attacker.bestMaxRange };
       const defenderBand = { min: defender.bestMinRange, max: defender.bestMaxRange };
       const attackerDamage = result.meta.damageTable?.[attackerKey]?.[defenderKey] ?? 0;
@@ -1017,6 +1053,9 @@
       lines.push(`Attacker: ${attacker.name} (best range ${attackerBand.min}-${attackerBand.max || attackerBand.min})`);
       lines.push(`Defender: ${defender.name} (best range ${defenderBand.min}-${defenderBand.max || defenderBand.min})`);
       lines.push(`Engagement distance: ${distance}`);
+      lines.push(`Attacker HP: ${attackerHp}, Defender HP: ${defenderHpStart}`);
+      lines.push(`Firepower modifiers: attacker ${attackerFirepower}%, counter ${defenderFirepower}%`);
+      lines.push(`Luck mode: ${luckMode}`);
       lines.push("");
 
       if (!attackerCanAttack) {
@@ -1025,9 +1064,35 @@
         return lines.join("\n");
       }
 
-      lines.push(`Attack result: ${attacker.name} deals ${attackerDamage.toFixed(1)}% to ${defender.name}.`);
-      if (defenderCanCounter) {
-        lines.push(`Counterattack: ${defender.name} deals ${defenderDamage.toFixed(1)}% back.`);
+      const luckBase = (() => {
+        if (luckMode === "min") return 0;
+        if (luckMode === "max") return 9;
+        if (luckMode === "random") return Math.floor(Math.random() * 10);
+        return 4.5;
+      })();
+
+      // AW-style simplification: base damage from matrix is at 100 HP,
+      // then scaled by current HP and firepower; luck is applied afterward
+      // and scaled by current HP as requested.
+      const computeShotDamage = (baseDamagePct, hp, firepowerPct, luckPercentBase) => {
+        const hpScale = hp / 100;
+        const modified = baseDamagePct * hpScale * (firepowerPct / 100);
+        const luckBonus = luckPercentBase * hpScale;
+        return Math.ceil(Math.max(0, modified + luckBonus));
+      };
+
+      const attackDealt = computeShotDamage(attackerDamage, attackerHp, attackerFirepower, luckBase);
+      const defenderHpAfter = Math.max(0, defenderHpStart - attackDealt);
+
+      lines.push(`Attack result: ${attacker.name} deals ${attackDealt}% (${attackerDamage.toFixed(1)} base at 100 HP).`);
+      lines.push(`${defender.name} HP after attack: ${defenderHpAfter}`);
+
+      if (defenderCanCounter && defenderHpAfter > 0) {
+        const counterLuckBase = luckMode === "random" ? Math.floor(Math.random() * 10) : luckBase;
+        const counterDealt = computeShotDamage(defenderDamage, defenderHpAfter, defenderFirepower, counterLuckBase);
+        const attackerHpAfter = Math.max(0, attackerHp - counterDealt);
+        lines.push(`Counterattack: ${defender.name} deals ${counterDealt}% (${defenderDamage.toFixed(1)} base at 100 HP).`);
+        lines.push(`${attacker.name} HP after counter: ${attackerHpAfter}`);
       } else {
         lines.push("Counterattack: None (defender cannot fire at this distance or has no valid damage entry).");
       }
@@ -1050,7 +1115,7 @@
       fillUnitSelect(simDefender, profiles);
       simDefender.selectedIndex = Math.min(1, simDefender.options.length - 1);
       simDistance.value = "";
-      simSection.style.display = "block";
+      simDistance.placeholder = "auto";
       simOutput.textContent = simulateAltercation(result, simAttacker.value, simDefender.value, NaN);
     }
 
@@ -1139,7 +1204,6 @@
         doneBadge.style.display = "inline-block";
       } catch (error) {
         resultSection.style.display = "none";
-        simSection.style.display = "none";
         setError(error?.message || "Failed to analyze files.");
       } finally {
         analyzeBtn.textContent = "Run Analysis";
@@ -1148,7 +1212,10 @@
     });
 
     simulateBtn.addEventListener("click", () => {
-      if (!state.result) return;
+      if (!state.result) {
+        simOutput.textContent = "Load CSV files and run analysis first.";
+        return;
+      }
       const dist = Number(simDistance.value);
       simOutput.textContent = simulateAltercation(state.result, simAttacker.value, simDefender.value, dist);
     });
