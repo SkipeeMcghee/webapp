@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.12";
+    window.APP_VERSION = "1.0.13";
   </script>
   <style>
     :root {
@@ -339,6 +339,44 @@
       overflow-x: auto;
     }
 
+    .unit-detail-grid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+      margin-top: 10px;
+    }
+
+    .unit-detail-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 8px 10px;
+    }
+
+    .unit-detail-label {
+      font-size: 0.76rem;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 3px;
+    }
+
+    .unit-detail-value {
+      font-size: 0.9rem;
+      color: #0f172a;
+      font-weight: 600;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .clickable-unit-row {
+      cursor: pointer;
+    }
+
+    .clickable-unit-row:hover {
+      background: #f5f9ff;
+    }
+
     .grade-s { background: #f3e8ff; color: #6b21a8; }
     .grade-a { background: #e0e7ff; color: #3730a3; }
     .grade-b { background: #dbeafe; color: #1d4ed8; }
@@ -351,6 +389,7 @@
       .results-grid { grid-template-columns: 1fr; }
       .sim-grid { grid-template-columns: 1fr; }
       .sim-top { grid-template-columns: 1fr; }
+      .unit-detail-grid { grid-template-columns: 1fr; }
       textarea { min-height: 300px; }
     }
   </style>
@@ -408,6 +447,13 @@
           </table>
         </div>
       </article>
+    </section>
+
+    <section id="unitDetailSection" class="card" style="display: none;">
+      <h2 style="margin: 0 0 8px; font-size: 1.05rem;">Unit Detail View</h2>
+      <div id="unitDetailTitle" style="font-weight: 700; font-size: 1rem;">Select a unit from the Unit Scores table.</div>
+      <div id="unitDetailMeta" class="small-note" style="margin-top: 4px;">Click any unit row to inspect detailed stats.</div>
+      <div id="unitDetailGrid" class="unit-detail-grid"></div>
     </section>
 
     <section id="simSection" class="card">
@@ -521,6 +567,10 @@
     const doneBadge = document.getElementById("doneBadge");
     const errorBox = document.getElementById("errorBox");
     const resultSection = document.getElementById("resultSection");
+    const unitDetailSection = document.getElementById("unitDetailSection");
+    const unitDetailTitle = document.getElementById("unitDetailTitle");
+    const unitDetailMeta = document.getElementById("unitDetailMeta");
+    const unitDetailGrid = document.getElementById("unitDetailGrid");
     const summaryText = document.getElementById("summaryText");
     const scoresBody = document.getElementById("scoresBody");
     const simSection = document.getElementById("simSection");
@@ -1152,6 +1202,12 @@
           unit: u.name,
           key: u.key,
           role,
+          cost: u.cost,
+          move: u.move,
+          moveType: u.moveType,
+          bestMinRange: u.bestRangeBand.min,
+          bestMaxRange: u.bestRangeBand.max,
+          hasDirectOption: u.hasDirectOption,
           avgDamage,
           costWeightedDamage,
           targetCoverage,
@@ -1371,7 +1427,7 @@
       updateSortHeaderIndicators();
 
       scoresBody.innerHTML = sortedRows.map((row) => `
-        <tr>
+        <tr class="clickable-unit-row" data-unit-key="${escapeHtml(row.key)}">
           <td class="${gradeClass(row.totalGrade)}"><strong>${escapeHtml(row.unit)}</strong></td>
           <td class="${gradeClass(row.totalGrade)}">${escapeHtml(row.role)}</td>
           <td class="${gradeClass(row.combatGrade)}">${row.combat.toFixed(1)} (${escapeHtml(row.combatGrade)})</td>
@@ -1383,6 +1439,57 @@
           <td class="${gradeClass(row.totalGrade)}"><strong>${row.total.toFixed(1)} (${escapeHtml(row.totalGrade)})</strong></td>
         </tr>
       `).join("");
+
+      scoresBody.querySelectorAll("tr[data-unit-key]").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const key = tr.dataset.unitKey || "";
+          renderUnitDetail(key);
+          unitDetailSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+
+    function renderUnitDetail(unitKey) {
+      if (!state.result?.rows?.length) return;
+      const row = state.result.rows.find((r) => r.key === unitKey) || state.result.rows[0];
+      if (!row) return;
+
+      const fmt = (n) => Number.isFinite(Number(n)) ? Number(n).toFixed(1) : String(n ?? "-");
+      const rangeBand = `${row.bestMinRange ?? 0}-${row.bestMaxRange ?? 0}`;
+
+      const detailItems = [
+        ["Role", row.role],
+        ["Cost", `${Math.round(row.cost || 0)}`],
+        ["Move", fmt(row.move)],
+        ["Move Type", row.moveType || "-"],
+        ["Best Range", rangeBand],
+        ["Direct Fire", row.hasDirectOption ? "Yes" : "No"],
+        ["Combat", `${fmt(row.combat)} (${row.combatGrade || "-"})`],
+        ["Durability", `${fmt(row.durability)} (${row.durabilityGrade || "-"})`],
+        ["Threat", `${fmt(row.threat)} (${row.threatGrade || "-"})`],
+        ["Endurance", `${fmt(row.endurance)} (${row.enduranceGrade || "-"})`],
+        ["Vision", `${fmt(row.vision)} (${row.visionGrade || "-"})`],
+        ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`],
+        ["Total", `${fmt(row.total)} (${row.totalGrade || "-"})`],
+        ["Cost-Weighted Damage", fmt(row.costWeightedDamage)],
+        ["Target Coverage", `${fmt((row.targetCoverage || 0) * 100)}%`],
+        ["Avg Incoming", fmt(row.avgIncoming)],
+        ["Avg Outgoing", fmt(row.avgDamage)],
+        ["Utility Notes", row.utilityNotes || "-"]
+      ];
+
+      unitDetailTitle.textContent = row.unit;
+      unitDetailMeta.textContent = `Key: ${row.key}`;
+      unitDetailGrid.innerHTML = detailItems
+        .map(([label, value]) => `
+          <article class="unit-detail-item">
+            <div class="unit-detail-label">${escapeHtml(label)}</div>
+            <div class="unit-detail-value">${escapeHtml(String(value))}</div>
+          </article>
+        `)
+        .join("");
+
+      unitDetailSection.style.display = "block";
     }
 
     function toggleSortForKey(key) {
@@ -1719,6 +1826,9 @@
 
       summaryText.value = renderSummary(analyzed);
       renderTable(analyzed.rows);
+      if (analyzed.rows.length) {
+        renderUnitDetail(analyzed.rows[0].key);
+      }
       setupSimulator(analyzed);
 
       resultSection.style.display = "grid";
@@ -1744,6 +1854,7 @@
         await runAnalysisFromRows(unitsRows, terrainRows, damageRows, "Analysis complete");
       } catch (error) {
         resultSection.style.display = "none";
+        unitDetailSection.style.display = "none";
         setError(error?.message || "Failed to analyze files.");
       } finally {
         analyzeBtn.textContent = "Run Analysis";
@@ -1769,6 +1880,7 @@
         await runAnalysisFromRows(unitsRows, terrainRows, damageRows, "Analysis complete (dev files)");
       } catch (error) {
         resultSection.style.display = "none";
+        unitDetailSection.style.display = "none";
         setError(error?.message || "Failed to run bundled dev analysis.");
       } finally {
         devAnalyzeBtn.textContent = prevLabel;
