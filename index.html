@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.15";
+    window.APP_VERSION = "1.0.16";
   </script>
   <style>
     :root {
@@ -489,6 +489,32 @@
     .unit-detail-micro .unit-detail-value {
       font-size: 0.82rem;
       font-weight: 700;
+    }
+
+    .unit-detail-full {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .unit-detail-full-body {
+      padding: 10px;
+    }
+
+    .unit-detail-codeblock {
+      margin: 0;
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 9px;
+      white-space: pre;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.8rem;
+      line-height: 1.35;
+      color: #0f172a;
     }
 
     .grade-s { background: #f3e8ff; color: #6b21a8; }
@@ -1195,6 +1221,7 @@
       const visionCol = detectColumn(unitCols, ["vision"]);
       const specialCol = detectColumn(unitCols, ["special", "ability", "abilities", "command", "commands"]);
       const carryCol = detectColumn(unitCols, ["carry", "transport", "capacity", "cargo"]);
+      const weapon1Col = detectExactColumn(unitCols, ["weapon 1", "weapon1"]);
       const weapon2Col = detectExactColumn(unitCols, ["weapon 2", "weapon2"]);
       const weapon1RangeCol = detectColumn(unitCols, ["weapon 1 range", "weapon1 range", "range 1", "weapon range"]);
       const weapon2RangeCol = detectColumn(unitCols, ["weapon 2 range", "weapon2 range", "range 2"]);
@@ -1216,6 +1243,7 @@
           const abilityScore = scoreAbilities(special);
           const carryInfo = parseCarryInfo(carryCol ? row[carryCol] : "");
           const transportScore = scoreTransport(carryInfo);
+          const weapon1Name = String(weapon1Col ? row[weapon1Col] ?? "" : "");
           const weapon2Name = String(weapon2Col ? row[weapon2Col] ?? "" : "");
           const hasSecondaryWeapon = hasRealWeaponName(weapon2Name);
           const weapon1Band = parseRangeBand(weapon1RangeCol ? row[weapon1RangeCol] : "1");
@@ -1237,13 +1265,20 @@
             abilityScore,
             carryInfo,
             transportScore,
+            weapon1Name,
+            weapon2Name,
             hasSecondaryWeapon,
             weapon1Band,
             weapon2Band,
             bestRangeBand,
             hasDirectOption,
             ammo1,
-            ammo2
+            ammo2,
+            weapon1RangeRaw: String(weapon1RangeCol ? row[weapon1RangeCol] ?? "" : ""),
+            weapon2RangeRaw: String(weapon2RangeCol ? row[weapon2RangeCol] ?? "" : ""),
+            ammo1Raw: String(ammo1Col ? row[ammo1Col] ?? "" : ""),
+            ammo2Raw: String(ammo2Col ? row[ammo2Col] ?? "" : ""),
+            rawRow: row
           };
         })
         .filter((u) => u.name);
@@ -1316,6 +1351,18 @@
 
         const simAsAttacker = units.map((defenderUnit) => simulateMatchupExchange(u, defenderUnit, damageMap));
         const simAsDefender = units.map((attackerUnit) => simulateMatchupExchange(attackerUnit, u, damageMap));
+        const attackValues = units.map((defenderUnit) => ({
+          unit: defenderUnit.name,
+          value: rowDamage.get(defenderUnit.key) ?? 0
+        }));
+        const defenseValues = units.map((attackerUnit) => ({
+          unit: attackerUnit.name,
+          value: damageMap.get(attackerUnit.key)?.get(u.key) ?? 0
+        }));
+        const rawStats = Object.entries(u.rawRow || {}).map(([label, value]) => ({
+          label: String(label),
+          value: String(value ?? "")
+        }));
 
         const avgIncoming = average(simAsDefender.map((m) => m.defenderHpLoss));
 
@@ -1375,6 +1422,12 @@
           bestMinRange: u.bestRangeBand.min,
           bestMaxRange: u.bestRangeBand.max,
           hasDirectOption: u.hasDirectOption,
+          weapon1Name: u.weapon1Name || "",
+          weapon2Name: u.weapon2Name || "",
+          weapon1RangeRaw: u.weapon1RangeRaw,
+          weapon2RangeRaw: u.weapon2RangeRaw,
+          ammo1Raw: u.ammo1Raw,
+          ammo2Raw: u.ammo2Raw,
           avgDamage,
           costWeightedDamage,
           targetCoverage,
@@ -1385,7 +1438,10 @@
           enduranceRaw,
           fogVisionRaw,
           utilityRaw,
-          utilityNotes: [...u.abilityScore.hits, ...u.transportScore.hits].join(", ") || "-"
+          utilityNotes: [...u.abilityScore.hits, ...u.transportScore.hits].join(", ") || "-",
+          attackValues,
+          defenseValues,
+          rawStats
         };
       });
 
@@ -1644,12 +1700,30 @@
         ["Cost", `${Math.round(row.cost || 0)}`],
         ["Move", fmt(row.move)],
         ["Move Type", row.moveType || "-"],
+        ["Weapon 1", row.weapon1Name || "-"],
+        ["Weapon 1 Ammo", row.ammo1Raw || "-"],
+        ["Weapon 1 Range", row.weapon1RangeRaw || "-"],
+        ["Weapon 2", row.weapon2Name || "-"],
+        ["Weapon 2 Ammo", row.ammo2Raw || "-"],
+        ["Weapon 2 Range", row.weapon2RangeRaw || "-"],
         ["Avg Outgoing", fmt(row.avgDamage)],
         ["Avg Incoming", fmt(row.avgIncoming)],
         ["Target Coverage", `${fmt((row.targetCoverage || 0) * 100)}%`],
         ["Cost-Weighted Damage", fmt(row.costWeightedDamage)],
         ["Utility Notes", row.utilityNotes || "-"]
       ];
+
+      const attackLines = (row.attackValues || [])
+        .map((x) => `${x.unit}: ${x.value}`)
+        .join("\n") || "No attack values.";
+
+      const defenseLines = (row.defenseValues || [])
+        .map((x) => `${x.unit}: ${x.value}`)
+        .join("\n") || "No defense values.";
+
+      const rawCsvLines = (row.rawStats || [])
+        .map((x) => `${x.label}: ${x.value}`)
+        .join("\n") || "No raw CSV fields.";
 
       unitDetailTitle.textContent = row.unit;
       unitDetailMeta.textContent = `Key: ${row.key}`;
@@ -1691,6 +1765,27 @@
                     <div class="unit-detail-value">${escapeHtml(String(value))}</div>
                   </article>
                 `).join("")}
+              </div>
+            </article>
+
+            <article class="unit-detail-full">
+              <h3 class="unit-section-title">Weapon Attack Values (Damage CSV Row)</h3>
+              <div class="unit-detail-full-body">
+                <pre class="unit-detail-codeblock">${escapeHtml(attackLines)}</pre>
+              </div>
+            </article>
+
+            <article class="unit-detail-full">
+              <h3 class="unit-section-title">Defense Values (Incoming Damage CSV Column)</h3>
+              <div class="unit-detail-full-body">
+                <pre class="unit-detail-codeblock">${escapeHtml(defenseLines)}</pre>
+              </div>
+            </article>
+
+            <article class="unit-detail-full">
+              <h3 class="unit-section-title">Raw Unit CSV Stats (Exact Values)</h3>
+              <div class="unit-detail-full-body">
+                <pre class="unit-detail-codeblock">${escapeHtml(rawCsvLines)}</pre>
               </div>
             </article>
           </div>
