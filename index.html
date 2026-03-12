@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.25";
+    window.APP_VERSION = "1.0.26";
   </script>
   <style>
     :root {
@@ -607,7 +607,7 @@
     .unit-core-weapons {
       display: grid;
       gap: 8px;
-      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      grid-template-columns: 1fr;
       margin-bottom: 8px;
     }
 
@@ -618,6 +618,28 @@
       padding: 8px 10px;
     }
 
+    .unit-core-weapon-combo {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+    }
+
+    .unit-core-weapon-cell {
+      min-height: 52px;
+    }
+
+    .unit-core-weapon-cell .unit-detail-label {
+      font-size: 0.68rem;
+      margin-bottom: 2px;
+    }
+
+    .unit-core-weapon-cell .unit-detail-value {
+      font-size: 0.84rem;
+      font-weight: 700;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
     .unit-core-weapon-name {
       font-size: 0.92rem;
       color: #0f172a;
@@ -625,21 +647,6 @@
       line-height: 1.2;
       margin-bottom: 6px;
       overflow-wrap: anywhere;
-    }
-
-    .unit-core-weapon-range {
-      border-top: 1px dashed #d3dce9;
-      padding-top: 6px;
-    }
-
-    .unit-core-weapon-range .unit-detail-label {
-      font-size: 0.68rem;
-      margin-bottom: 2px;
-    }
-
-    .unit-core-weapon-range .unit-detail-value {
-      font-size: 0.82rem;
-      font-weight: 700;
     }
 
     .unit-core-item {
@@ -685,6 +692,7 @@
 
     @media (max-width: 640px) {
       .unit-core-weapons { grid-template-columns: 1fr; }
+      .unit-core-weapon-combo { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1982,19 +1990,23 @@
               <div class="unit-detail-full-body">
                 <div class="unit-core-weapons">
                   <article class="unit-core-weapon">
-                    <div class="unit-detail-label">Weapon 1</div>
-                    <div class="unit-core-weapon-name">${escapeHtml(row.weapon1Name || "-")}</div>
-                    <div class="unit-core-weapon-range">
-                      <div class="unit-detail-label">Ammo</div>
-                      <div class="unit-detail-value">${escapeHtml(row.ammo1Raw || "-")}</div>
-                    </div>
-                  </article>
-                  <article class="unit-core-weapon">
-                    <div class="unit-detail-label">Weapon 2</div>
-                    <div class="unit-core-weapon-name">${escapeHtml(row.weapon2Name || "-")}</div>
-                    <div class="unit-core-weapon-range">
-                      <div class="unit-detail-label">Range</div>
-                      <div class="unit-detail-value">${escapeHtml(sharedWeaponRange)}</div>
+                    <div class="unit-core-weapon-combo">
+                      <article class="unit-core-weapon-cell">
+                        <div class="unit-detail-label">Weapon 1</div>
+                        <div class="unit-detail-value">${escapeHtml(row.weapon1Name || "-")}</div>
+                      </article>
+                      <article class="unit-core-weapon-cell">
+                        <div class="unit-detail-label">Weapon 2</div>
+                        <div class="unit-detail-value">${escapeHtml(row.weapon2Name || "-")}</div>
+                      </article>
+                      <article class="unit-core-weapon-cell">
+                        <div class="unit-detail-label">Ammo</div>
+                        <div class="unit-detail-value">${escapeHtml(row.ammo1Raw || "-")}</div>
+                      </article>
+                      <article class="unit-core-weapon-cell">
+                        <div class="unit-detail-label">Range</div>
+                        <div class="unit-detail-value">${escapeHtml(sharedWeaponRange)}</div>
+                      </article>
                     </div>
                   </article>
                 </div>
