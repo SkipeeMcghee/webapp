@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.8";
+    window.APP_VERSION = "1.0.9";
   </script>
   <style>
     :root {
@@ -270,16 +270,53 @@
       background: white;
     }
 
-    .sim-output {
+    .sim-layout {
       margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .sim-top {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+    }
+
+    .sim-panel {
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .sim-panel-title {
+      margin: 0;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      background: #eef2f7;
+      color: #0f172a;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .sim-panel-body {
       padding: 10px;
       white-space: pre-wrap;
       font-family: Consolas, "Courier New", monospace;
       font-size: 0.86rem;
       line-height: 1.35;
+      min-height: 72px;
+    }
+
+    .sim-result-body {
+      min-height: 84px;
+    }
+
+    .sim-log-body {
+      min-height: 180px;
+      max-height: 320px;
+      overflow: auto;
     }
 
     .grade-s { background: #f3e8ff; color: #6b21a8; }
@@ -293,6 +330,7 @@
       .uploader-grid { grid-template-columns: 1fr; }
       .results-grid { grid-template-columns: 1fr; }
       .sim-grid { grid-template-columns: 1fr; }
+      .sim-top { grid-template-columns: 1fr; }
       textarea { min-height: 300px; }
     }
   </style>
@@ -401,7 +439,26 @@
           <button id="simulateBtn" type="button">Simulate</button>
         </div>
       </div>
-      <div id="simOutput" class="sim-output">Load CSV files and run analysis to enable simulator calculations.</div>
+      <div class="sim-layout">
+        <div class="sim-top">
+          <article class="sim-panel">
+            <h3 class="sim-panel-title">Unit A (Attacker)</h3>
+            <div id="simUnitA" class="sim-panel-body">Load CSV files and run analysis to enable simulator calculations.</div>
+          </article>
+          <article class="sim-panel">
+            <h3 class="sim-panel-title">Unit B (Defender)</h3>
+            <div id="simUnitB" class="sim-panel-body">Load CSV files and run analysis to enable simulator calculations.</div>
+          </article>
+        </div>
+        <article class="sim-panel">
+          <h3 class="sim-panel-title">Results</h3>
+          <div id="simResult" class="sim-panel-body sim-result-body">No simulation yet.</div>
+        </article>
+        <article class="sim-panel">
+          <h3 class="sim-panel-title">Combat Log</h3>
+          <div id="simLog" class="sim-panel-body sim-log-body">No simulation yet.</div>
+        </article>
+      </div>
     </section>
   </main>
 
@@ -443,7 +500,10 @@
     const simAttackerFirepower = document.getElementById("simAttackerFirepower");
     const simDefenderFirepower = document.getElementById("simDefenderFirepower");
     const simulateBtn = document.getElementById("simulateBtn");
-    const simOutput = document.getElementById("simOutput");
+    const simUnitA = document.getElementById("simUnitA");
+    const simUnitB = document.getElementById("simUnitB");
+    const simResult = document.getElementById("simResult");
+    const simLog = document.getElementById("simLog");
     const appVersionPill = document.getElementById("appVersionPill");
     const simVersionText = document.getElementById("simVersionText");
     const sortHeaders = Array.from(document.querySelectorAll("th[data-sort-key]"));
@@ -1344,13 +1404,17 @@
       };
     }
 
-    function buildBattlefieldView(attackerLabel, attackerHp, defenderLabel, defenderHp, distance) {
-      const aTag = unitGlyph(attackerLabel);
-      const dTag = unitGlyph(defenderLabel);
-      const left = `[A:${aTag}] ${attackerLabel.padEnd(20, " ")} HP ${String(attackerHp).padStart(3, " ")} [${hpBar(attackerHp)}]`;
-      const right = `[${hpBar(defenderHp)}] HP ${String(defenderHp).padStart(3, " ")} ${defenderLabel.padEnd(20, " ")} [D:${dTag}]`;
-      const lane = `${"<".repeat(10)} distance ${distance} ${">".repeat(10)}`;
-      return `${left.padEnd(62, " ")}${right}\n${lane}\nATTACKER (LEFT)${" ".repeat(35)}DEFENDER (RIGHT)`;
+    function formatRangeBand(band) {
+      if (!band || band.max <= 0) return "N/A";
+      if (band.min === band.max) return String(band.min);
+      return `${band.min}-${band.max}`;
+    }
+
+    function renderSimulationPanels(payload) {
+      simUnitA.textContent = payload?.unitA ?? "-";
+      simUnitB.textContent = payload?.unitB ?? "-";
+      simResult.textContent = payload?.result ?? "-";
+      simLog.textContent = payload?.log ?? "-";
     }
 
     function simulateAltercation(result, attackerKey, defenderKey, requestedDistance) {
@@ -1358,7 +1422,12 @@
       const attacker = profileMap.get(attackerKey);
       const defender = profileMap.get(defenderKey);
       if (!attacker || !defender) {
-        return "Choose valid attacker and defender units.";
+        return {
+          unitA: "Select a valid attacker.",
+          unitB: "Select a valid defender.",
+          result: "Cannot simulate until both units are valid.",
+          log: "No combat log available."
+        };
       }
 
       const distance = Number.isFinite(requestedDistance) && requestedDistance > 0
@@ -1380,77 +1449,97 @@
       const defenderCanCounter = defenderDamage > 0 && isDistanceInBand(distance, defenderBand);
       const { attackerLabel, defenderLabel } = getSimDisplayNames(attacker, defender);
 
-      const lines = [];
-      lines.push("=== BATTLEFIELD: START ===");
-      lines.push(buildBattlefieldView(attackerLabel, attackerHp, defenderLabel, defenderHpStart, distance));
-      lines.push("");
-      lines.push("=== COMBAT LOG ===");
-      lines.push(`> ${attackerLabel} eyes ${defenderLabel} at range ${distance}.`);
-      lines.push(`> Rules: luck=${luckMode}, firepower A:${attackerFirepower}% D:${defenderFirepower}%.`);
-
-      if (!attackerCanAttack) {
-        lines.push(`> ${attackerLabel} cannot attack from this distance. No shots fired.`);
-        lines.push(`> Potential best-weapon damage at valid range: ${attackerDamage.toFixed(1)}%.`);
-        lines.push("");
-        lines.push("=== BATTLEFIELD: END ===");
-        lines.push(buildBattlefieldView(attackerLabel, attackerHp, defenderLabel, defenderHpStart, distance));
-        lines.push("");
-        lines.push("=== RESULT ===");
-        lines.push("Stalemate. Position or range must change.");
-        return lines.join("\n");
-      }
-
-      const luckBase = (() => {
-        if (luckMode === "min") return 0;
-        if (luckMode === "max") return 9;
-        if (luckMode === "random") return Math.floor(Math.random() * 10);
-        return 4.5;
-      })();
-
-      // AW-style simplification: base damage from matrix is at 100 HP,
-      // then scaled by current HP and firepower; luck is applied afterward
-      // and scaled by current HP as requested.
-      const computeShotDamage = (baseDamagePct, hp, firepowerPct, luckPercentBase) => {
-        const hpScale = hp / 100;
-        const modified = baseDamagePct * hpScale * (firepowerPct / 100);
-        const luckBonus = luckPercentBase * hpScale;
-        return Math.ceil(Math.max(0, modified + luckBonus));
-      };
-
-      const attackDealt = computeShotDamage(attackerDamage, attackerHp, attackerFirepower, luckBase);
-      const defenderHpAfter = Math.max(0, defenderHpStart - attackDealt);
-
-      lines.push(`> ${attackerLabel} strikes! ${attackDealt}% damage dealt (${attackerDamage.toFixed(1)} base @100 HP).`);
-      lines.push(`> ${defenderLabel} drops to ${defenderHpAfter} HP.`);
+      const logLines = [];
+      logLines.push(`> ${attackerLabel} advances from the left toward ${defenderLabel}.`);
+      logLines.push(`> Engagement range: ${distance}.`);
+      logLines.push(`> Modifiers: luck=${luckMode}, firepower A:${attackerFirepower}% D:${defenderFirepower}%.`);
 
       let attackerHpAfter = attackerHp;
+      let defenderHpAfter = defenderHpStart;
+      let outcome = "";
+      let counterState = "No";
 
-      if (defenderCanCounter && defenderHpAfter > 0) {
-        const counterLuckBase = luckMode === "random" ? Math.floor(Math.random() * 10) : luckBase;
-        const counterDealt = computeShotDamage(defenderDamage, defenderHpAfter, defenderFirepower, counterLuckBase);
-        attackerHpAfter = Math.max(0, attackerHp - counterDealt);
-        lines.push(`> ${defenderLabel} counters for ${counterDealt}% (${defenderDamage.toFixed(1)} base @100 HP).`);
-        lines.push(`> ${attackerLabel} falls to ${attackerHpAfter} HP.`);
+      if (!attackerCanAttack) {
+        logLines.push(`> ${attackerLabel} cannot fire from this range. No shots fired.`);
+        logLines.push(`> Potential best-weapon damage at valid range: ${attackerDamage.toFixed(1)}%.`);
+        outcome = "Stalemate. Position or range must change.";
       } else {
-        lines.push(`> ${defenderLabel} cannot counterattack from this range.`);
+        const luckBase = (() => {
+          if (luckMode === "min") return 0;
+          if (luckMode === "max") return 9;
+          if (luckMode === "random") return Math.floor(Math.random() * 10);
+          return 4.5;
+        })();
+
+        // AW-style simplification: base damage from matrix is at 100 HP,
+        // then scaled by current HP and firepower; luck is applied afterward
+        // and scaled by current HP as requested.
+        const computeShotDamage = (baseDamagePct, hp, firepowerPct, luckPercentBase) => {
+          const hpScale = hp / 100;
+          const modified = baseDamagePct * hpScale * (firepowerPct / 100);
+          const luckBonus = luckPercentBase * hpScale;
+          return Math.ceil(Math.max(0, modified + luckBonus));
+        };
+
+        const attackDealt = computeShotDamage(attackerDamage, attackerHp, attackerFirepower, luckBase);
+        defenderHpAfter = Math.max(0, defenderHpStart - attackDealt);
+
+        logLines.push(`> ${attackerLabel} strikes for ${attackDealt}% (${attackerDamage.toFixed(1)} base @100 HP).`);
+        logLines.push(`> ${defenderLabel} now has ${defenderHpAfter} HP.`);
+
+        if (defenderCanCounter && defenderHpAfter > 0) {
+          const counterLuckBase = luckMode === "random" ? Math.floor(Math.random() * 10) : luckBase;
+          const counterDealt = computeShotDamage(defenderDamage, defenderHpAfter, defenderFirepower, counterLuckBase);
+          attackerHpAfter = Math.max(0, attackerHp - counterDealt);
+          counterState = "Yes";
+          logLines.push(`> ${defenderLabel} counters for ${counterDealt}% (${defenderDamage.toFixed(1)} base @100 HP).`);
+          logLines.push(`> ${attackerLabel} now has ${attackerHpAfter} HP.`);
+        } else {
+          logLines.push(`> ${defenderLabel} cannot counterattack from this range.`);
+        }
+
+        if (attackerHpAfter <= 0 && defenderHpAfter <= 0) {
+          outcome = "Double knockout.";
+        } else if (defenderHpAfter <= 0) {
+          outcome = `${attackerLabel} wins the exchange.`;
+        } else if (attackerHpAfter <= 0) {
+          outcome = `${defenderLabel} holds and wins on counterfire.`;
+        } else {
+          outcome = `${attackerLabel}: ${attackerHpAfter} HP | ${defenderLabel}: ${defenderHpAfter} HP`;
+        }
       }
 
-      lines.push("");
-      lines.push("=== BATTLEFIELD: END ===");
-      lines.push(buildBattlefieldView(attackerLabel, attackerHpAfter, defenderLabel, defenderHpAfter, distance));
-      lines.push("");
-      lines.push("=== RESULT ===");
-      if (attackerHpAfter <= 0 && defenderHpAfter <= 0) {
-        lines.push("Double knockout.");
-      } else if (defenderHpAfter <= 0) {
-        lines.push(`${attackerLabel} wins the exchange.`);
-      } else if (attackerHpAfter <= 0) {
-        lines.push(`${defenderLabel} holds and wins on counterfire.`);
-      } else {
-        lines.push(`${attackerLabel}: ${attackerHpAfter} HP | ${defenderLabel}: ${defenderHpAfter} HP`);
-      }
+      const unitAInfo = [
+        `${attackerLabel}`,
+        `Role: Attacker (left)`,
+        `Range band: ${formatRangeBand(attackerBand)}`,
+        `Damage vs ${defenderLabel}: ${attackerDamage.toFixed(1)}%`,
+        `Start HP: ${attackerHp} [${hpBar(attackerHp)}]`,
+        `End HP:   ${attackerHpAfter} [${hpBar(attackerHpAfter)}]`
+      ].join("\n");
 
-      return lines.join("\n");
+      const unitBInfo = [
+        `${defenderLabel}`,
+        `Role: Defender (right)`,
+        `Range band: ${formatRangeBand(defenderBand)}`,
+        `Damage vs ${attackerLabel}: ${defenderDamage.toFixed(1)}%`,
+        `Start HP: ${defenderHpStart} [${hpBar(defenderHpStart)}]`,
+        `End HP:   ${defenderHpAfter} [${hpBar(defenderHpAfter)}]`
+      ].join("\n");
+
+      const resultInfo = [
+        `Distance: ${distance}`,
+        `Attacker can fire: ${attackerCanAttack ? "Yes" : "No"}`,
+        `Defender countered: ${counterState}`,
+        `Outcome: ${outcome}`
+      ].join("\n");
+
+      return {
+        unitA: unitAInfo,
+        unitB: unitBInfo,
+        result: resultInfo,
+        log: logLines.join("\n")
+      };
     }
 
     function fillUnitSelect(selectEl, profiles) {
@@ -1469,7 +1558,7 @@
       simDefender.selectedIndex = Math.min(1, simDefender.options.length - 1);
       simDistance.value = "";
       simDistance.placeholder = "auto";
-      simOutput.textContent = simulateAltercation(result, simAttacker.value, simDefender.value, NaN);
+      renderSimulationPanels(simulateAltercation(result, simAttacker.value, simDefender.value, NaN));
     }
 
     function setError(message) {
@@ -1606,11 +1695,16 @@
 
     simulateBtn.addEventListener("click", () => {
       if (!state.result) {
-        simOutput.textContent = "Load CSV files and run analysis first.";
+        renderSimulationPanels({
+          unitA: "Load CSV files and run analysis first.",
+          unitB: "Load CSV files and run analysis first.",
+          result: "No simulation available.",
+          log: "No combat log available."
+        });
         return;
       }
       const dist = Number(simDistance.value);
-      simOutput.textContent = simulateAltercation(state.result, simAttacker.value, simDefender.value, dist);
+      renderSimulationPanels(simulateAltercation(state.result, simAttacker.value, simDefender.value, dist));
     });
 
     simAttacker.addEventListener("change", () => {
