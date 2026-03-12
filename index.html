@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.0";
+    window.APP_VERSION = "1.0.1";
   </script>
   <style>
     :root {
@@ -295,6 +295,7 @@
       <div class="uploader-grid" id="uploaders"></div>
       <div class="actions" style="margin-top: 14px;">
         <button id="analyzeBtn" disabled>Run Analysis</button>
+        <button id="devAnalyzeBtn" type="button">Run With Dev CSVs</button>
         <span id="doneBadge" class="badge" style="display: none;">Analysis complete</span>
       </div>
       <p class="small-note" style="margin: 10px 0 0;">
@@ -402,6 +403,7 @@
 
     const uploaders = document.getElementById("uploaders");
     const analyzeBtn = document.getElementById("analyzeBtn");
+    const devAnalyzeBtn = document.getElementById("devAnalyzeBtn");
     const doneBadge = document.getElementById("doneBadge");
     const errorBox = document.getElementById("errorBox");
     const resultSection = document.getElementById("resultSection");
@@ -741,6 +743,20 @@
         reader.onerror = () => reject(new Error("Failed to read file."));
         reader.readAsText(file);
       });
+    }
+
+    async function parseBundledCsv(path) {
+      const url = `./${encodeURIComponent(path)}?v=${encodeURIComponent(APP_VERSION)}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error(`Missing bundled dev file: ${path}`);
+      }
+      const text = await res.text();
+      const rows = parseCsvText(text);
+      if (!rows.length) {
+        throw new Error(`Bundled dev file is empty: ${path}`);
+      }
+      return rows;
     }
 
     // Core strategic value model (not a board simulator).
@@ -1252,10 +1268,24 @@
 
     fileDefs.forEach((def) => uploaders.appendChild(buildDrop(def)));
 
+    async function runAnalysisFromRows(unitsRows, terrainRows, damageRows, doneLabel = "Analysis complete") {
+      const analyzed = analyze(unitsRows, damageRows, terrainRows);
+      state.result = analyzed;
+
+      summaryText.value = renderSummary(analyzed);
+      renderTable(analyzed.rows);
+      setupSimulator(analyzed);
+
+      resultSection.style.display = "grid";
+      doneBadge.textContent = doneLabel;
+      doneBadge.style.display = "inline-block";
+    }
+
     analyzeBtn.addEventListener("click", async () => {
       if (!state.unitsFile || !state.terrainFile || !state.damageFile) return;
 
       analyzeBtn.disabled = true;
+      devAnalyzeBtn.disabled = true;
       analyzeBtn.textContent = "Analyzing...";
       doneBadge.style.display = "none";
       setError("");
@@ -1266,21 +1296,38 @@
           parseCsvFile(state.terrainFile),
           parseCsvFile(state.damageFile)
         ]);
-
-        const analyzed = analyze(unitsRows, damageRows, terrainRows);
-        state.result = analyzed;
-
-        summaryText.value = renderSummary(analyzed);
-        renderTable(analyzed.rows);
-        setupSimulator(analyzed);
-
-        resultSection.style.display = "grid";
-        doneBadge.style.display = "inline-block";
+        await runAnalysisFromRows(unitsRows, terrainRows, damageRows, "Analysis complete");
       } catch (error) {
         resultSection.style.display = "none";
         setError(error?.message || "Failed to analyze files.");
       } finally {
         analyzeBtn.textContent = "Run Analysis";
+        devAnalyzeBtn.disabled = false;
+        syncButtonState();
+      }
+    });
+
+    devAnalyzeBtn.addEventListener("click", async () => {
+      const prevLabel = devAnalyzeBtn.textContent;
+      analyzeBtn.disabled = true;
+      devAnalyzeBtn.disabled = true;
+      devAnalyzeBtn.textContent = "Loading Dev CSVs...";
+      doneBadge.style.display = "none";
+      setError("");
+
+      try {
+        const [unitsRows, terrainRows, damageRows] = await Promise.all([
+          parseBundledCsv("Units.csv"),
+          parseBundledCsv("Terrain.csv"),
+          parseBundledCsv("Damage.csv")
+        ]);
+        await runAnalysisFromRows(unitsRows, terrainRows, damageRows, "Analysis complete (dev files)");
+      } catch (error) {
+        resultSection.style.display = "none";
+        setError(error?.message || "Failed to run bundled dev analysis.");
+      } finally {
+        devAnalyzeBtn.textContent = prevLabel;
+        devAnalyzeBtn.disabled = false;
         syncButtonState();
       }
     });
