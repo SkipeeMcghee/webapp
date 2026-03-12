@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.7";
+    window.APP_VERSION = "1.0.8";
   </script>
   <style>
     :root {
@@ -1329,13 +1329,28 @@
       return `${"#".repeat(filled)}${"-".repeat(10 - filled)}`;
     }
 
-    function buildBattlefieldView(attacker, attackerHp, defender, defenderHp, distance) {
-      const aTag = unitGlyph(attacker.name);
-      const dTag = unitGlyph(defender.name);
-      const lane = `${"=".repeat(8)} D:${distance} ${"=".repeat(8)}`;
-      const left = `[${aTag}] ${attacker.name.padEnd(22, " ")} HP ${String(attackerHp).padStart(3, " ")} [${hpBar(attackerHp)}]`;
-      const right = `[${dTag}] ${defender.name.padEnd(22, " ")} HP ${String(defenderHp).padStart(3, " ")} [${hpBar(defenderHp)}]`;
-      return `${left}\n${lane}\n${right}`;
+    function getSimDisplayNames(attacker, defender) {
+      const attackerName = String(attacker?.name || "Attacker").trim();
+      const defenderName = String(defender?.name || "Defender").trim();
+      if (attackerName.localeCompare(defenderName, undefined, { sensitivity: "accent" }) === 0) {
+        return {
+          attackerLabel: `${attackerName} A`,
+          defenderLabel: `${defenderName} B`
+        };
+      }
+      return {
+        attackerLabel: attackerName,
+        defenderLabel: defenderName
+      };
+    }
+
+    function buildBattlefieldView(attackerLabel, attackerHp, defenderLabel, defenderHp, distance) {
+      const aTag = unitGlyph(attackerLabel);
+      const dTag = unitGlyph(defenderLabel);
+      const left = `[A:${aTag}] ${attackerLabel.padEnd(20, " ")} HP ${String(attackerHp).padStart(3, " ")} [${hpBar(attackerHp)}]`;
+      const right = `[${hpBar(defenderHp)}] HP ${String(defenderHp).padStart(3, " ")} ${defenderLabel.padEnd(20, " ")} [D:${dTag}]`;
+      const lane = `${"<".repeat(10)} distance ${distance} ${">".repeat(10)}`;
+      return `${left.padEnd(62, " ")}${right}\n${lane}\nATTACKER (LEFT)${" ".repeat(35)}DEFENDER (RIGHT)`;
     }
 
     function simulateAltercation(result, attackerKey, defenderKey, requestedDistance) {
@@ -1363,21 +1378,22 @@
 
       const attackerCanAttack = attackerDamage > 0 && isDistanceInBand(distance, attackerBand);
       const defenderCanCounter = defenderDamage > 0 && isDistanceInBand(distance, defenderBand);
+      const { attackerLabel, defenderLabel } = getSimDisplayNames(attacker, defender);
 
       const lines = [];
       lines.push("=== BATTLEFIELD: START ===");
-      lines.push(buildBattlefieldView(attacker, attackerHp, defender, defenderHpStart, distance));
+      lines.push(buildBattlefieldView(attackerLabel, attackerHp, defenderLabel, defenderHpStart, distance));
       lines.push("");
       lines.push("=== COMBAT LOG ===");
-      lines.push(`> ${attacker.name} eyes ${defender.name} at range ${distance}.`);
+      lines.push(`> ${attackerLabel} eyes ${defenderLabel} at range ${distance}.`);
       lines.push(`> Rules: luck=${luckMode}, firepower A:${attackerFirepower}% D:${defenderFirepower}%.`);
 
       if (!attackerCanAttack) {
-        lines.push(`> ${attacker.name} cannot attack from this distance. No shots fired.`);
+        lines.push(`> ${attackerLabel} cannot attack from this distance. No shots fired.`);
         lines.push(`> Potential best-weapon damage at valid range: ${attackerDamage.toFixed(1)}%.`);
         lines.push("");
         lines.push("=== BATTLEFIELD: END ===");
-        lines.push(buildBattlefieldView(attacker, attackerHp, defender, defenderHpStart, distance));
+        lines.push(buildBattlefieldView(attackerLabel, attackerHp, defenderLabel, defenderHpStart, distance));
         lines.push("");
         lines.push("=== RESULT ===");
         lines.push("Stalemate. Position or range must change.");
@@ -1404,8 +1420,8 @@
       const attackDealt = computeShotDamage(attackerDamage, attackerHp, attackerFirepower, luckBase);
       const defenderHpAfter = Math.max(0, defenderHpStart - attackDealt);
 
-      lines.push(`> ${attacker.name} strikes! ${attackDealt}% damage dealt (${attackerDamage.toFixed(1)} base @100 HP).`);
-      lines.push(`> ${defender.name} drops to ${defenderHpAfter} HP.`);
+      lines.push(`> ${attackerLabel} strikes! ${attackDealt}% damage dealt (${attackerDamage.toFixed(1)} base @100 HP).`);
+      lines.push(`> ${defenderLabel} drops to ${defenderHpAfter} HP.`);
 
       let attackerHpAfter = attackerHp;
 
@@ -1413,25 +1429,25 @@
         const counterLuckBase = luckMode === "random" ? Math.floor(Math.random() * 10) : luckBase;
         const counterDealt = computeShotDamage(defenderDamage, defenderHpAfter, defenderFirepower, counterLuckBase);
         attackerHpAfter = Math.max(0, attackerHp - counterDealt);
-        lines.push(`> ${defender.name} counters for ${counterDealt}% (${defenderDamage.toFixed(1)} base @100 HP).`);
-        lines.push(`> ${attacker.name} falls to ${attackerHpAfter} HP.`);
+        lines.push(`> ${defenderLabel} counters for ${counterDealt}% (${defenderDamage.toFixed(1)} base @100 HP).`);
+        lines.push(`> ${attackerLabel} falls to ${attackerHpAfter} HP.`);
       } else {
-        lines.push(`> ${defender.name} cannot counterattack from this range.`);
+        lines.push(`> ${defenderLabel} cannot counterattack from this range.`);
       }
 
       lines.push("");
       lines.push("=== BATTLEFIELD: END ===");
-      lines.push(buildBattlefieldView(attacker, attackerHpAfter, defender, defenderHpAfter, distance));
+      lines.push(buildBattlefieldView(attackerLabel, attackerHpAfter, defenderLabel, defenderHpAfter, distance));
       lines.push("");
       lines.push("=== RESULT ===");
       if (attackerHpAfter <= 0 && defenderHpAfter <= 0) {
         lines.push("Double knockout.");
       } else if (defenderHpAfter <= 0) {
-        lines.push(`${attacker.name} wins the exchange.`);
+        lines.push(`${attackerLabel} wins the exchange.`);
       } else if (attackerHpAfter <= 0) {
-        lines.push(`${defender.name} holds and wins on counterfire.`);
+        lines.push(`${defenderLabel} holds and wins on counterfire.`);
       } else {
-        lines.push(`${attacker.name}: ${attackerHpAfter} HP | ${defender.name}: ${defenderHpAfter} HP`);
+        lines.push(`${attackerLabel}: ${attackerHpAfter} HP | ${defenderLabel}: ${defenderHpAfter} HP`);
       }
 
       return lines.join("\n");
