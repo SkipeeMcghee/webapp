@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.20";
+    window.APP_VERSION = "1.0.21";
   </script>
   <style>
     :root {
@@ -525,6 +525,44 @@
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 
+    .unit-core-weapons {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      margin-bottom: 8px;
+    }
+
+    .unit-core-weapon {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 8px 10px;
+    }
+
+    .unit-core-weapon-name {
+      font-size: 0.92rem;
+      color: #0f172a;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 6px;
+      overflow-wrap: anywhere;
+    }
+
+    .unit-core-weapon-range {
+      border-top: 1px dashed #d3dce9;
+      padding-top: 6px;
+    }
+
+    .unit-core-weapon-range .unit-detail-label {
+      font-size: 0.68rem;
+      margin-bottom: 2px;
+    }
+
+    .unit-core-weapon-range .unit-detail-value {
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
     .unit-core-item {
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -564,6 +602,10 @@
       .unit-section-body { grid-template-columns: 1fr 1fr; }
       .unit-core-grid { grid-template-columns: 1fr; }
       textarea { min-height: 300px; }
+    }
+
+    @media (max-width: 640px) {
+      .unit-core-weapons { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -1748,7 +1790,11 @@
         .map((x) => `${x.unit}: ${x.value}`)
         .join("\n") || "No defense values.";
 
-      const coreStats = Array.isArray(row.rawStats) ? row.rawStats : [];
+      const weaponFieldPattern = /weapon\s*[12](?:\s*range)?/i;
+      const coreStats = (Array.isArray(row.rawStats) ? row.rawStats : []).filter((x) => {
+        const label = String(x?.label ?? "");
+        return !weaponFieldPattern.test(label);
+      });
 
       unitDetailTitle.textContent = row.unit;
       unitDetailMeta.textContent = `Key: ${row.key}`;
@@ -1772,6 +1818,24 @@
             <article class="unit-section">
               <h3 class="unit-section-title">Core Attributes</h3>
               <div class="unit-detail-full-body">
+                <div class="unit-core-weapons">
+                  <article class="unit-core-weapon">
+                    <div class="unit-detail-label">Weapon 1</div>
+                    <div class="unit-core-weapon-name">${escapeHtml(row.weapon1Name || "-")}</div>
+                    <div class="unit-core-weapon-range">
+                      <div class="unit-detail-label">Range</div>
+                      <div class="unit-detail-value">${escapeHtml(row.weapon1RangeRaw || "-")}</div>
+                    </div>
+                  </article>
+                  <article class="unit-core-weapon">
+                    <div class="unit-detail-label">Weapon 2</div>
+                    <div class="unit-core-weapon-name">${escapeHtml(row.weapon2Name || "-")}</div>
+                    <div class="unit-core-weapon-range">
+                      <div class="unit-detail-label">Range</div>
+                      <div class="unit-detail-value">${escapeHtml(row.weapon2RangeRaw || "-")}</div>
+                    </div>
+                  </article>
+                </div>
                 <div class="unit-core-grid">
                   ${coreStats.length
                     ? coreStats.map((x) => `
