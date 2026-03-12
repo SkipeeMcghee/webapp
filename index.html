@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Red Zone Unit Analyzer</title>
+  <script>
+    // Single source-of-truth app version.
+    window.APP_VERSION = "1.0.0";
+  </script>
   <style>
     :root {
       --bg-1: #f5f7fa;
@@ -205,6 +209,26 @@
       color: var(--muted);
     }
 
+    .version-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    .version-pill {
+      display: inline-block;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
     .sim-grid {
       display: grid;
       gap: 10px;
@@ -261,6 +285,10 @@
         Upload Units.csv, Terrain.csv, and Damage.csv to compute role-weighted scores across combat exchange,
         durability, threat projection, endurance, fog vision, and utility.
       </p>
+      <div class="version-row">
+        <span>Version</span>
+        <span id="appVersionPill" class="version-pill">-</span>
+      </div>
     </section>
 
     <section class="card">
@@ -305,6 +333,7 @@
 
     <section id="simSection" class="card">
       <h2 style="margin: 0 0 10px; font-size: 1.05rem;">Single Altercation Simulator</h2>
+      <div class="small-note" style="margin: 0 0 8px;">Simulator Version: <strong id="simVersionText">-</strong></div>
       <p class="small-note" style="margin: 0 0 12px;">
         Uses best-weapon damage from the matrix and best-weapon range bands from Units.csv. Base damage assumes 100 HP,
         then scales by current HP. Damage is rounded up. Luck is 0% to +9%, applied after firepower modifiers and scaled by current HP.
@@ -356,6 +385,8 @@
   </main>
 
   <script>
+    const APP_VERSION = window.APP_VERSION || "1.0.0";
+
     const state = {
       unitsFile: null,
       terrainFile: null,
@@ -387,6 +418,11 @@
     const simDefenderFirepower = document.getElementById("simDefenderFirepower");
     const simulateBtn = document.getElementById("simulateBtn");
     const simOutput = document.getElementById("simOutput");
+    const appVersionPill = document.getElementById("appVersionPill");
+    const simVersionText = document.getElementById("simVersionText");
+
+    appVersionPill.textContent = APP_VERSION;
+    simVersionText.textContent = APP_VERSION;
 
     function escapeHtml(s) {
       return String(s)
