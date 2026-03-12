@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.9";
+    window.APP_VERSION = "1.0.10";
   </script>
   <style>
     :root {
@@ -442,12 +442,22 @@
       <div class="sim-layout">
         <div class="sim-top">
           <article class="sim-panel">
-            <h3 class="sim-panel-title">Unit A (Attacker)</h3>
+            <h3 class="sim-panel-title">Unit A (Before Altercation)</h3>
             <div id="simUnitA" class="sim-panel-body">Load CSV files and run analysis to enable simulator calculations.</div>
           </article>
           <article class="sim-panel">
-            <h3 class="sim-panel-title">Unit B (Defender)</h3>
+            <h3 class="sim-panel-title">Unit B (Before Altercation)</h3>
             <div id="simUnitB" class="sim-panel-body">Load CSV files and run analysis to enable simulator calculations.</div>
+          </article>
+        </div>
+        <div class="sim-top">
+          <article class="sim-panel">
+            <h3 class="sim-panel-title">Unit A (After Altercation)</h3>
+            <div id="simUnitAAfter" class="sim-panel-body">No simulation yet.</div>
+          </article>
+          <article class="sim-panel">
+            <h3 class="sim-panel-title">Unit B (After Altercation)</h3>
+            <div id="simUnitBAfter" class="sim-panel-body">No simulation yet.</div>
           </article>
         </div>
         <article class="sim-panel">
@@ -502,6 +512,8 @@
     const simulateBtn = document.getElementById("simulateBtn");
     const simUnitA = document.getElementById("simUnitA");
     const simUnitB = document.getElementById("simUnitB");
+    const simUnitAAfter = document.getElementById("simUnitAAfter");
+    const simUnitBAfter = document.getElementById("simUnitBAfter");
     const simResult = document.getElementById("simResult");
     const simLog = document.getElementById("simLog");
     const appVersionPill = document.getElementById("appVersionPill");
@@ -1411,8 +1423,10 @@
     }
 
     function renderSimulationPanels(payload) {
-      simUnitA.textContent = payload?.unitA ?? "-";
-      simUnitB.textContent = payload?.unitB ?? "-";
+      simUnitA.textContent = payload?.unitABefore ?? payload?.unitA ?? "-";
+      simUnitB.textContent = payload?.unitBBefore ?? payload?.unitB ?? "-";
+      simUnitAAfter.textContent = payload?.unitAAfter ?? "-";
+      simUnitBAfter.textContent = payload?.unitBAfter ?? "-";
       simResult.textContent = payload?.result ?? "-";
       simLog.textContent = payload?.log ?? "-";
     }
@@ -1423,8 +1437,10 @@
       const defender = profileMap.get(defenderKey);
       if (!attacker || !defender) {
         return {
-          unitA: "Select a valid attacker.",
-          unitB: "Select a valid defender.",
+          unitABefore: "Select a valid attacker.",
+          unitBBefore: "Select a valid defender.",
+          unitAAfter: "No post-altercation state available.",
+          unitBAfter: "No post-altercation state available.",
           result: "Cannot simulate until both units are valid.",
           log: "No combat log available."
         };
@@ -1509,22 +1525,36 @@
         }
       }
 
-      const unitAInfo = [
+      const unitABeforeInfo = [
         `${attackerLabel}`,
         `Role: Attacker (left)`,
         `Range band: ${formatRangeBand(attackerBand)}`,
         `Damage vs ${defenderLabel}: ${attackerDamage.toFixed(1)}%`,
-        `Start HP: ${attackerHp} [${hpBar(attackerHp)}]`,
-        `End HP:   ${attackerHpAfter} [${hpBar(attackerHpAfter)}]`
+        `HP: ${attackerHp} [${hpBar(attackerHp)}]`
       ].join("\n");
 
-      const unitBInfo = [
+      const unitBBeforeInfo = [
         `${defenderLabel}`,
         `Role: Defender (right)`,
         `Range band: ${formatRangeBand(defenderBand)}`,
         `Damage vs ${attackerLabel}: ${defenderDamage.toFixed(1)}%`,
-        `Start HP: ${defenderHpStart} [${hpBar(defenderHpStart)}]`,
-        `End HP:   ${defenderHpAfter} [${hpBar(defenderHpAfter)}]`
+        `HP: ${defenderHpStart} [${hpBar(defenderHpStart)}]`
+      ].join("\n");
+
+      const unitAAfterInfo = [
+        `${attackerLabel}`,
+        `Role: Attacker (left)`,
+        `Range band: ${formatRangeBand(attackerBand)}`,
+        `Damage vs ${defenderLabel}: ${attackerDamage.toFixed(1)}%`,
+        `HP: ${attackerHpAfter} [${hpBar(attackerHpAfter)}]`
+      ].join("\n");
+
+      const unitBAfterInfo = [
+        `${defenderLabel}`,
+        `Role: Defender (right)`,
+        `Range band: ${formatRangeBand(defenderBand)}`,
+        `Damage vs ${attackerLabel}: ${defenderDamage.toFixed(1)}%`,
+        `HP: ${defenderHpAfter} [${hpBar(defenderHpAfter)}]`
       ].join("\n");
 
       const resultInfo = [
@@ -1535,8 +1565,10 @@
       ].join("\n");
 
       return {
-        unitA: unitAInfo,
-        unitB: unitBInfo,
+        unitABefore: unitABeforeInfo,
+        unitBBefore: unitBBeforeInfo,
+        unitAAfter: unitAAfterInfo,
+        unitBAfter: unitBAfterInfo,
         result: resultInfo,
         log: logLines.join("\n")
       };
@@ -1696,8 +1728,10 @@
     simulateBtn.addEventListener("click", () => {
       if (!state.result) {
         renderSimulationPanels({
-          unitA: "Load CSV files and run analysis first.",
-          unitB: "Load CSV files and run analysis first.",
+          unitABefore: "Load CSV files and run analysis first.",
+          unitBBefore: "Load CSV files and run analysis first.",
+          unitAAfter: "No post-altercation state available.",
+          unitBAfter: "No post-altercation state available.",
           result: "No simulation available.",
           log: "No combat log available."
         });
