@@ -287,7 +287,6 @@
             <thead>
               <tr>
                 <th>Unit</th>
-                <th>Grade</th>
                 <th>Role</th>
                 <th>Combat</th>
                 <th>Durability</th>
@@ -582,6 +581,16 @@
       if (rankPercent >= 0.3) return "C";
       if (rankPercent >= 0.15) return "D";
       return "F";
+    }
+
+    function buildMetricGrades(rows, metricKey) {
+      const ranked = [...rows].sort((a, b) => (b[metricKey] ?? 0) - (a[metricKey] ?? 0));
+      const gradesByKey = new Map();
+      ranked.forEach((row, idx, arr) => {
+        const rankPercent = arr.length <= 1 ? 1 : 1 - idx / (arr.length - 1);
+        gradesByKey.set(row.key, gradeFromRankPercent(rankPercent));
+      });
+      return gradesByKey;
     }
 
     function parseRangeBand(value) {
@@ -937,20 +946,27 @@
         };
       });
 
-      const sorted = [...scored].sort((a, b) => b.total - a.total);
-      const graded = sorted.map((row, idx, arr) => {
-        const rankPercent = arr.length <= 1 ? 1 : 1 - idx / (arr.length - 1);
-        return {
-          ...row,
-          grade: gradeFromRankPercent(rankPercent)
-        };
-      });
+      const metricKeys = ["combat", "durability", "threat", "endurance", "vision", "utility", "total"];
+      const gradeMaps = Object.fromEntries(metricKeys.map((k) => [k, buildMetricGrades(scored, k)]));
+
+      const enriched = scored.map((row) => ({
+        ...row,
+        combatGrade: gradeMaps.combat.get(row.key),
+        durabilityGrade: gradeMaps.durability.get(row.key),
+        threatGrade: gradeMaps.threat.get(row.key),
+        enduranceGrade: gradeMaps.endurance.get(row.key),
+        visionGrade: gradeMaps.vision.get(row.key),
+        utilityGrade: gradeMaps.utility.get(row.key),
+        totalGrade: gradeMaps.total.get(row.key)
+      }));
+
+      const sorted = [...enriched].sort((a, b) => b.total - a.total);
 
       const summary = {
-        top5: graded.slice(0, 5),
-        bottom5: [...graded].slice(-5).reverse(),
-        biggestCombat: [...graded].sort((a, b) => b.combat - a.combat).slice(0, 5),
-        biggestUtility: [...graded].sort((a, b) => b.utility - a.utility).slice(0, 5)
+        top5: sorted.slice(0, 5),
+        bottom5: [...sorted].slice(-5).reverse(),
+        biggestCombat: [...sorted].sort((a, b) => b.combat - a.combat).slice(0, 5),
+        biggestUtility: [...sorted].sort((a, b) => b.utility - a.utility).slice(0, 5)
       };
 
       const damageTable = {};
@@ -970,7 +986,7 @@
       }));
 
       return {
-        rows: graded,
+        rows: sorted,
         summary,
         meta: {
           units: units.length,
@@ -999,22 +1015,22 @@
       lines.push("");
       lines.push("Top 5 total-score units:");
       r.summary.top5.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} [${u.grade}] - total ${u.total.toFixed(1)}, combat ${u.combat.toFixed(1)}, threat ${u.threat.toFixed(1)}, endurance ${u.endurance.toFixed(1)}, vision ${u.vision.toFixed(1)}, utility ${u.utility.toFixed(1)}.`);
+        lines.push(`${i + 1}. ${u.unit} - total ${u.total.toFixed(1)} (${u.totalGrade}), combat ${u.combat.toFixed(1)} (${u.combatGrade}), threat ${u.threat.toFixed(1)} (${u.threatGrade}), endurance ${u.endurance.toFixed(1)} (${u.enduranceGrade}), vision ${u.vision.toFixed(1)} (${u.visionGrade}), utility ${u.utility.toFixed(1)} (${u.utilityGrade}).`);
       });
       lines.push("");
       lines.push("Top 5 combat-exchange units:");
       r.summary.biggestCombat.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} - combat ${u.combat.toFixed(1)}, cost-weighted damage ${u.costWeightedDamage.toFixed(1)}, avg incoming ${u.avgIncoming.toFixed(1)}.`);
+        lines.push(`${i + 1}. ${u.unit} - combat ${u.combat.toFixed(1)} (${u.combatGrade}), cost-weighted damage ${u.costWeightedDamage.toFixed(1)}, avg incoming ${u.avgIncoming.toFixed(1)}.`);
       });
       lines.push("");
       lines.push("Top 5 utility units:");
       r.summary.biggestUtility.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} - utility ${u.utility.toFixed(1)}, notes: ${u.utilityNotes}.`);
+        lines.push(`${i + 1}. ${u.unit} - utility ${u.utility.toFixed(1)} (${u.utilityGrade}), notes: ${u.utilityNotes}.`);
       });
       lines.push("");
       lines.push("Bottom 5 total-score units:");
       r.summary.bottom5.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} [${u.grade}] - total ${u.total.toFixed(1)}.`);
+        lines.push(`${i + 1}. ${u.unit} - total ${u.total.toFixed(1)} (${u.totalGrade}).`);
       });
       return lines.join("\n");
     }
@@ -1023,15 +1039,14 @@
       scoresBody.innerHTML = rows.map((row) => `
         <tr>
           <td><strong>${escapeHtml(row.unit)}</strong></td>
-          <td><strong>${escapeHtml(row.grade)}</strong></td>
           <td>${escapeHtml(row.role)}</td>
-          <td>${row.combat.toFixed(1)}</td>
-          <td>${row.durability.toFixed(1)}</td>
-          <td>${row.threat.toFixed(1)}</td>
-          <td>${row.endurance.toFixed(1)}</td>
-          <td>${row.vision.toFixed(1)}</td>
-          <td>${row.utility.toFixed(1)}</td>
-          <td><strong>${row.total.toFixed(1)}</strong></td>
+          <td>${row.combat.toFixed(1)} (${escapeHtml(row.combatGrade)})</td>
+          <td>${row.durability.toFixed(1)} (${escapeHtml(row.durabilityGrade)})</td>
+          <td>${row.threat.toFixed(1)} (${escapeHtml(row.threatGrade)})</td>
+          <td>${row.endurance.toFixed(1)} (${escapeHtml(row.enduranceGrade)})</td>
+          <td>${row.vision.toFixed(1)} (${escapeHtml(row.visionGrade)})</td>
+          <td>${row.utility.toFixed(1)} (${escapeHtml(row.utilityGrade)})</td>
+          <td><strong>${row.total.toFixed(1)} (${escapeHtml(row.totalGrade)})</strong></td>
         </tr>
       `).join("");
     }
