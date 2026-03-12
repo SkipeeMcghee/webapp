@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.23";
+    window.APP_VERSION = "1.0.24";
   </script>
   <style>
     :root {
@@ -1690,7 +1690,11 @@
         name: u.name,
         bestMinRange: u.bestRangeBand.min,
         bestMaxRange: u.bestRangeBand.max,
-        hasDirectOption: u.hasDirectOption
+        hasDirectOption: u.hasDirectOption,
+        weapon1Name: u.weapon1Name || "",
+        weapon2Name: u.weapon2Name || "",
+        weapon1Band: u.weapon1Band,
+        weapon2Band: u.weapon2Band
       }));
 
       return {
@@ -2112,6 +2116,28 @@
       return `${band.min}-${band.max}`;
     }
 
+    function chooseWeaponForDistance(profile, distance) {
+      const candidates = [
+        {
+          name: String(profile?.weapon1Name || "").trim(),
+          band: profile?.weapon1Band,
+          order: 1
+        },
+        {
+          name: String(profile?.weapon2Name || "").trim(),
+          band: profile?.weapon2Band,
+          order: 2
+        }
+      ].filter((w) => hasRealWeaponName(w.name) && w.band && w.band.max > 0);
+
+      const inRange = candidates.filter((w) => isDistanceInBand(distance, w.band));
+      if (inRange.length > 0) {
+        // Keep selection deterministic: prefer Weapon 1 when multiple weapons are valid.
+        return inRange.sort((a, b) => a.order - b.order)[0];
+      }
+      return null;
+    }
+
     function renderSimulationPanels(payload) {
       simUnitA.textContent = payload?.unitABefore ?? payload?.unitA ?? "-";
       simUnitB.textContent = payload?.unitBBefore ?? payload?.unitB ?? "-";
@@ -2152,6 +2178,8 @@
       const defenderBand = { min: defender.bestMinRange, max: defender.bestMaxRange };
       const attackerDamage = result.meta.damageTable?.[attackerKey]?.[defenderKey] ?? 0;
       const defenderDamage = result.meta.damageTable?.[defenderKey]?.[attackerKey] ?? 0;
+      const attackerWeapon = chooseWeaponForDistance(attacker, distance);
+      const defenderWeapon = chooseWeaponForDistance(defender, distance);
 
       const attackerCanAttack = attackerDamage > 0 && isDistanceInBand(distance, attackerBand);
       const defenderCanCounter = defenderDamage > 0 && isDistanceInBand(distance, defenderBand);
@@ -2193,7 +2221,10 @@
         const attackDealt = computeShotDamage(attackerDamage, attackerHp, attackerFirepower, luckBase);
         defenderHpAfter = Math.max(0, defenderHpStart - attackDealt);
 
-        logLines.push(`> ${attackerLabel} strikes for ${attackDealt}% (${attackerDamage.toFixed(1)} base @100 HP).`);
+        const attackerWeaponText = attackerWeapon
+          ? `${attackerWeapon.name} [${formatRangeBand(attackerWeapon.band)}]`
+          : "Unknown weapon";
+        logLines.push(`> ${attackerLabel} attacks with ${attackerWeaponText} for ${attackDealt}% (${attackerDamage.toFixed(1)} base @100 HP).`);
         logLines.push(`> ${defenderLabel} now has ${defenderHpAfter} HP.`);
 
         if (defenderCanCounter && defenderHpAfter > 0) {
@@ -2202,7 +2233,10 @@
           attackerHpAfter = Math.max(0, attackerHp - counterDealt);
           counterState = "Yes";
           counterOccurred = true;
-          logLines.push(`> ${defenderLabel} counters for ${counterDealt}% (${defenderDamage.toFixed(1)} base @100 HP).`);
+          const defenderWeaponText = defenderWeapon
+            ? `${defenderWeapon.name} [${formatRangeBand(defenderWeapon.band)}]`
+            : "Unknown weapon";
+          logLines.push(`> ${defenderLabel} counterattacks with ${defenderWeaponText} for ${counterDealt}% (${defenderDamage.toFixed(1)} base @100 HP).`);
           logLines.push(`> ${attackerLabel} now has ${attackerHpAfter} HP.`);
         } else {
           logLines.push(`> ${defenderLabel} cannot counterattack from this range.`);
