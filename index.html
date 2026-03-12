@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.16";
+    window.APP_VERSION = "1.0.17";
   </script>
   <style>
     :root {
@@ -418,7 +418,7 @@
     .unit-kpi-row {
       display: grid;
       gap: 8px;
-      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     }
 
     .unit-kpi {
@@ -1684,19 +1684,16 @@
         ["Total", `${fmt(row.total)} (${row.totalGrade || "-"})`],
         ["Combat", `${fmt(row.combat)} (${row.combatGrade || "-"})`],
         ["Durability", `${fmt(row.durability)} (${row.durabilityGrade || "-"})`],
-        ["Threat", `${fmt(row.threat)} (${row.threatGrade || "-"})`]
-      ];
-
-      const tacticalDetails = [
+        ["Threat", `${fmt(row.threat)} (${row.threatGrade || "-"})`],
         ["Endurance", `${fmt(row.endurance)} (${row.enduranceGrade || "-"})`],
         ["Vision", `${fmt(row.vision)} (${row.visionGrade || "-"})`],
-        ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`],
-        ["Role", row.role],
-        ["Best Range", rangeBand],
-        ["Direct Fire", row.hasDirectOption ? "Yes" : "No"]
+        ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`]
       ];
 
       const profileDetails = [
+        ["Role", row.role],
+        ["Best Range", rangeBand],
+        ["Direct Fire", row.hasDirectOption ? "Yes" : "No"],
         ["Cost", `${Math.round(row.cost || 0)}`],
         ["Move", fmt(row.move)],
         ["Move Type", row.moveType || "-"],
@@ -1746,13 +1743,8 @@
           <div class="unit-detail-sections">
             <article class="unit-section">
               <h3 class="unit-section-title">Core Attributes</h3>
-              <div class="unit-section-body">
-                ${tacticalDetails.map(([label, value]) => `
-                  <article class="unit-detail-micro">
-                    <div class="unit-detail-label">${escapeHtml(label)}</div>
-                    <div class="unit-detail-value">${escapeHtml(String(value))}</div>
-                  </article>
-                `).join("")}
+              <div class="unit-detail-full-body">
+                <pre class="unit-detail-codeblock">${escapeHtml(rawCsvLines)}</pre>
               </div>
             </article>
 
@@ -1779,13 +1771,6 @@
               <h3 class="unit-section-title">Defense Values (Incoming Damage CSV Column)</h3>
               <div class="unit-detail-full-body">
                 <pre class="unit-detail-codeblock">${escapeHtml(defenseLines)}</pre>
-              </div>
-            </article>
-
-            <article class="unit-detail-full">
-              <h3 class="unit-section-title">Raw Unit CSV Stats (Exact Values)</h3>
-              <div class="unit-detail-full-body">
-                <pre class="unit-detail-codeblock">${escapeHtml(rawCsvLines)}</pre>
               </div>
             </article>
           </div>
