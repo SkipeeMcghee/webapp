@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.13";
+    window.APP_VERSION = "1.0.14";
   </script>
   <style>
     :root {
@@ -912,6 +912,55 @@
       return 0.9;
     }
 
+    function computeShotDamage(baseDamagePct, hp, firepowerPct = 100, luckPercentBase = 4.5) {
+      const hpScale = hp / 100;
+      const modified = baseDamagePct * hpScale * (firepowerPct / 100);
+      const luckBonus = luckPercentBase * hpScale;
+      return Math.ceil(Math.max(0, modified + luckBonus));
+    }
+
+    function simulateMatchupExchange(attackerUnit, defenderUnit, damageMap) {
+      const attackerBand = attackerUnit.bestRangeBand || { min: 0, max: 0 };
+      const defenderBand = defenderUnit.bestRangeBand || { min: 0, max: 0 };
+      const distance = attackerBand.min > 0 ? attackerBand.min : 1;
+
+      const attackerBase = damageMap.get(attackerUnit.key)?.get(defenderUnit.key) ?? 0;
+      const defenderBase = damageMap.get(defenderUnit.key)?.get(attackerUnit.key) ?? 0;
+
+      let attackerHpAfter = 100;
+      let defenderHpAfter = 100;
+
+      const attackerCanAttack = attackerBase > 0 && isDistanceInBand(distance, attackerBand);
+      if (!attackerCanAttack) {
+        return {
+          attackerHpAfter,
+          defenderHpAfter,
+          attackerHpLoss: 0,
+          defenderHpLoss: 0,
+          counterHappened: false
+        };
+      }
+
+      const attackDealt = computeShotDamage(attackerBase, 100, 100, 4.5);
+      defenderHpAfter = Math.max(0, 100 - attackDealt);
+
+      let counterHappened = false;
+      const defenderCanCounter = defenderBase > 0 && defenderHpAfter > 0 && isDistanceInBand(distance, defenderBand);
+      if (defenderCanCounter) {
+        const counterDealt = computeShotDamage(defenderBase, defenderHpAfter, 100, 4.5);
+        attackerHpAfter = Math.max(0, 100 - counterDealt);
+        counterHappened = true;
+      }
+
+      return {
+        attackerHpAfter,
+        defenderHpAfter,
+        attackerHpLoss: 100 - attackerHpAfter,
+        defenderHpLoss: 100 - defenderHpAfter,
+        counterHappened
+      };
+    }
+
     // Lightweight CSV parser with quoted-field support.
     function parseCsvText(text) {
       const rows = [];
@@ -1148,19 +1197,26 @@
         const countCoverage = defendersWithKnownCost.length > 0 ? positiveDamages.length / defendersWithKnownCost.length : 0;
         const targetCoverage = Math.pow(Math.max(0, valueCoverage) * Math.max(0, countCoverage), 0.5);
 
-        const incomingHits = units
-          .map((other) => {
-            const otherMap = damageMap.get(other.key) ?? new Map();
-            return otherMap.get(u.key) ?? 0;
-          })
-          .filter((n) => n > 0);
+        const simAsAttacker = units.map((defenderUnit) => simulateMatchupExchange(u, defenderUnit, damageMap));
+        const simAsDefender = units.map((attackerUnit) => simulateMatchupExchange(attackerUnit, u, damageMap));
 
-        const avgIncoming = average(incomingHits);
-        const durabilityRaw = avgIncoming > 0 ? 100 - avgIncoming : 100;
+        const avgIncoming = average(simAsDefender.map((m) => m.defenderHpLoss));
+
+        const combatMatchValues = simAsAttacker.map((m) => {
+          const killBonus = m.defenderHpAfter <= 0 ? 18 : 0;
+          const counterPenalty = m.attackerHpLoss * 0.35;
+          return m.defenderHpLoss + killBonus - counterPenalty;
+        });
+        const combatExchangeRaw = average(combatMatchValues);
+
+        const durabilitySamples = simAsDefender.map((m) => {
+          const holdBonus = m.attackerHpAfter <= 0 ? 8 : 0;
+          return m.defenderHpAfter + holdBonus;
+        });
+        const durabilityRaw = average(durabilitySamples);
 
         const maxRange = Math.max(u.bestRangeBand.max, 1);
         const indirect = maxRange > 1;
-        const direct = u.hasDirectOption;
 
         const canMoveAndFire = maxRange === 1 && u.hasDirectOption;
         const sameTurnReach = canMoveAndFire ? (u.move + 1) : maxRange;
@@ -1169,14 +1225,8 @@
         // Only range-1 units can move and attack in one turn.
         const threatRaw = Math.max(0, (sameTurnReach * mobilityFactor) - (canMoveAndFire ? 0 : 0.8));
 
-        const setupModifier = indirect ? (maxRange <= 3 ? 0.88 : maxRange <= 5 ? 0.83 : 0.8) : 1;
-        const offensivePressure = costWeightedDamage * setupModifier * targetCoverage;
-        const returnFirePenalty = direct
-          ? Math.min(avgIncoming * 0.35, offensivePressure * 0.85)
-          : 0;
-        const combatExchangeRaw = offensivePressure > 0
-          ? Math.max(offensivePressure * 0.05, offensivePressure - returnFirePenalty)
-          : 0;
+        const setupModifier = indirect ? (maxRange <= 3 ? 0.95 : maxRange <= 5 ? 0.9 : 0.85) : 1;
+        const coverageAdjustedCombatRaw = combatExchangeRaw * (0.7 + targetCoverage * 0.3) * setupModifier;
 
         const turnEndurance = u.fuel.normalDrain > 0 ? u.fuel.fuelMax / u.fuel.normalDrain : u.fuel.fuelMax;
         const movementBudget = u.move * (turnEndurance || 0);
@@ -1212,7 +1262,7 @@
           costWeightedDamage,
           targetCoverage,
           avgIncoming,
-          combatExchangeRaw,
+          combatExchangeRaw: coverageAdjustedCombatRaw,
           durabilityRaw,
           threatRaw,
           enduranceRaw,
