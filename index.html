@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.22";
+    window.APP_VERSION = "1.0.23";
   </script>
   <style>
     :root {
@@ -1866,6 +1866,15 @@
       const normalizeTypeLabel = (value) => {
         const raw = String(value ?? "").trim();
         if (!raw) return "Unknown";
+
+        const key = raw.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        if (["infantry", "mech", "tread", "treads", "tire", "tires"].includes(key)) {
+          return "Infantry + Mech + Treads + Tires";
+        }
+        if (["ship", "ships", "lander", "landing", "naval"].includes(key)) {
+          return "Ship + Lander";
+        }
+
         return raw
           .split(/[\s_\-/]+/)
           .filter(Boolean)
