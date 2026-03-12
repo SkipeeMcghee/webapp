@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.19";
+    window.APP_VERSION = "1.0.20";
   </script>
   <style>
     :root {
@@ -340,9 +340,8 @@
     }
 
     .unit-detail-grid {
-      display: grid;
-      gap: 8px;
-      grid-template-columns: repeat(3, minmax(160px, 1fr));
+      display: block;
+      width: 100%;
       margin-top: 10px;
     }
 
@@ -377,18 +376,11 @@
       background: #f5f9ff;
     }
 
-    #unitDetailSection {
-      width: 100vw;
-      margin-left: calc(50% - 50vw);
-      margin-right: calc(50% - 50vw);
-      border-radius: 0;
-      padding: 18px 3vw;
-    }
-
     .unit-detail-shell {
       margin-top: 10px;
       display: grid;
       gap: 12px;
+      width: 100%;
     }
 
     .unit-detail-hero {
