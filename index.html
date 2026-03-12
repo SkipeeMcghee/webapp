@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.14";
+    window.APP_VERSION = "1.0.15";
   </script>
   <style>
     :root {
@@ -377,6 +377,120 @@
       background: #f5f9ff;
     }
 
+    .unit-detail-shell {
+      margin-top: 10px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .unit-detail-hero {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+      padding: 12px;
+      display: grid;
+      gap: 12px;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+    }
+
+    .unit-icon {
+      width: 76px;
+      height: 76px;
+      border-radius: 12px;
+      border: 1px solid #c7d5ea;
+      background: #f0f7ff;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 1.45rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+    }
+
+    .unit-hero-main {
+      display: grid;
+      gap: 8px;
+    }
+
+    .unit-kpi-row {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+    }
+
+    .unit-kpi {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 8px 10px;
+    }
+
+    .unit-kpi-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.04em;
+      margin-bottom: 3px;
+    }
+
+    .unit-kpi-value {
+      font-size: 1.05rem;
+      line-height: 1.15;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .unit-detail-sections {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+    }
+
+    .unit-section {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #f8fafc;
+      overflow: hidden;
+    }
+
+    .unit-section-title {
+      margin: 0;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      background: #eef2f7;
+      color: #0f172a;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .unit-section-body {
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(130px, 1fr));
+    }
+
+    .unit-detail-micro {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      padding: 7px 9px;
+    }
+
+    .unit-detail-micro .unit-detail-label {
+      font-size: 0.68rem;
+      margin-bottom: 2px;
+    }
+
+    .unit-detail-micro .unit-detail-value {
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
     .grade-s { background: #f3e8ff; color: #6b21a8; }
     .grade-a { background: #e0e7ff; color: #3730a3; }
     .grade-b { background: #dbeafe; color: #1d4ed8; }
@@ -390,6 +504,9 @@
       .sim-grid { grid-template-columns: 1fr; }
       .sim-top { grid-template-columns: 1fr; }
       .unit-detail-grid { grid-template-columns: 1fr; }
+      .unit-kpi-row { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .unit-detail-sections { grid-template-columns: 1fr; }
+      .unit-section-body { grid-template-columns: 1fr 1fr; }
       textarea { min-height: 300px; }
     }
   </style>
@@ -1506,38 +1623,79 @@
 
       const fmt = (n) => Number.isFinite(Number(n)) ? Number(n).toFixed(1) : String(n ?? "-");
       const rangeBand = `${row.bestMinRange ?? 0}-${row.bestMaxRange ?? 0}`;
-
-      const detailItems = [
-        ["Role", row.role],
-        ["Cost", `${Math.round(row.cost || 0)}`],
-        ["Move", fmt(row.move)],
-        ["Move Type", row.moveType || "-"],
-        ["Best Range", rangeBand],
-        ["Direct Fire", row.hasDirectOption ? "Yes" : "No"],
+      const symbol = unitGlyph(row.unit).trim() || "???";
+      const kpi = [
+        ["Total", `${fmt(row.total)} (${row.totalGrade || "-"})`],
         ["Combat", `${fmt(row.combat)} (${row.combatGrade || "-"})`],
         ["Durability", `${fmt(row.durability)} (${row.durabilityGrade || "-"})`],
-        ["Threat", `${fmt(row.threat)} (${row.threatGrade || "-"})`],
+        ["Threat", `${fmt(row.threat)} (${row.threatGrade || "-"})`]
+      ];
+
+      const tacticalDetails = [
         ["Endurance", `${fmt(row.endurance)} (${row.enduranceGrade || "-"})`],
         ["Vision", `${fmt(row.vision)} (${row.visionGrade || "-"})`],
         ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`],
-        ["Total", `${fmt(row.total)} (${row.totalGrade || "-"})`],
-        ["Cost-Weighted Damage", fmt(row.costWeightedDamage)],
-        ["Target Coverage", `${fmt((row.targetCoverage || 0) * 100)}%`],
-        ["Avg Incoming", fmt(row.avgIncoming)],
+        ["Role", row.role],
+        ["Best Range", rangeBand],
+        ["Direct Fire", row.hasDirectOption ? "Yes" : "No"]
+      ];
+
+      const profileDetails = [
+        ["Cost", `${Math.round(row.cost || 0)}`],
+        ["Move", fmt(row.move)],
+        ["Move Type", row.moveType || "-"],
         ["Avg Outgoing", fmt(row.avgDamage)],
+        ["Avg Incoming", fmt(row.avgIncoming)],
+        ["Target Coverage", `${fmt((row.targetCoverage || 0) * 100)}%`],
+        ["Cost-Weighted Damage", fmt(row.costWeightedDamage)],
         ["Utility Notes", row.utilityNotes || "-"]
       ];
 
       unitDetailTitle.textContent = row.unit;
       unitDetailMeta.textContent = `Key: ${row.key}`;
-      unitDetailGrid.innerHTML = detailItems
-        .map(([label, value]) => `
-          <article class="unit-detail-item">
-            <div class="unit-detail-label">${escapeHtml(label)}</div>
-            <div class="unit-detail-value">${escapeHtml(String(value))}</div>
+      unitDetailGrid.innerHTML = `
+        <div class="unit-detail-shell">
+          <article class="unit-detail-hero">
+            <div class="unit-icon" aria-label="unit-symbol">${escapeHtml(symbol)}</div>
+            <div class="unit-hero-main">
+              <div class="unit-kpi-row">
+                ${kpi.map(([label, value]) => `
+                  <article class="unit-kpi">
+                    <div class="unit-kpi-label">${escapeHtml(label)}</div>
+                    <div class="unit-kpi-value">${escapeHtml(String(value))}</div>
+                  </article>
+                `).join("")}
+              </div>
+            </div>
           </article>
-        `)
-        .join("");
+
+          <div class="unit-detail-sections">
+            <article class="unit-section">
+              <h3 class="unit-section-title">Core Attributes</h3>
+              <div class="unit-section-body">
+                ${tacticalDetails.map(([label, value]) => `
+                  <article class="unit-detail-micro">
+                    <div class="unit-detail-label">${escapeHtml(label)}</div>
+                    <div class="unit-detail-value">${escapeHtml(String(value))}</div>
+                  </article>
+                `).join("")}
+              </div>
+            </article>
+
+            <article class="unit-section">
+              <h3 class="unit-section-title">Secondary Details</h3>
+              <div class="unit-section-body">
+                ${profileDetails.map(([label, value]) => `
+                  <article class="unit-detail-micro">
+                    <div class="unit-detail-label">${escapeHtml(label)}</div>
+                    <div class="unit-detail-value">${escapeHtml(String(value))}</div>
+                  </article>
+                `).join("")}
+              </div>
+            </article>
+          </div>
+        </div>
+      `;
 
       unitDetailSection.style.display = "block";
     }
