@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.24";
+    window.APP_VERSION = "1.0.25";
   </script>
   <style>
     :root {
@@ -1950,6 +1950,7 @@
 
       const attackValuesHtml = renderGroupedValues(row.attackValues);
       const defenseValuesHtml = renderGroupedValues(row.defenseValues);
+      const sharedWeaponRange = row.weapon1RangeRaw || row.weapon2RangeRaw || "-";
 
       const weaponFieldPattern = /weapon\s*[12](?:\s*range)?/i;
       const coreStats = (Array.isArray(row.rawStats) ? row.rawStats : []).filter((x) => {
@@ -1984,8 +1985,8 @@
                     <div class="unit-detail-label">Weapon 1</div>
                     <div class="unit-core-weapon-name">${escapeHtml(row.weapon1Name || "-")}</div>
                     <div class="unit-core-weapon-range">
-                      <div class="unit-detail-label">Range</div>
-                      <div class="unit-detail-value">${escapeHtml(row.weapon1RangeRaw || "-")}</div>
+                      <div class="unit-detail-label">Ammo</div>
+                      <div class="unit-detail-value">${escapeHtml(row.ammo1Raw || "-")}</div>
                     </div>
                   </article>
                   <article class="unit-core-weapon">
@@ -1993,7 +1994,7 @@
                     <div class="unit-core-weapon-name">${escapeHtml(row.weapon2Name || "-")}</div>
                     <div class="unit-core-weapon-range">
                       <div class="unit-detail-label">Range</div>
-                      <div class="unit-detail-value">${escapeHtml(row.weapon2RangeRaw || "-")}</div>
+                      <div class="unit-detail-value">${escapeHtml(sharedWeaponRange)}</div>
                     </div>
                   </article>
                 </div>
