@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.21";
+    window.APP_VERSION = "1.0.22";
   </script>
   <style>
     :root {
@@ -517,6 +517,85 @@
       font-size: 0.8rem;
       line-height: 1.35;
       color: #0f172a;
+    }
+
+    .unit-value-groups {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+
+    .unit-value-group {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    .unit-value-group-title {
+      margin: 0;
+      padding: 7px 9px;
+      border-bottom: 1px solid var(--border);
+      background: #f3f6fb;
+      color: #0f172a;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .unit-value-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 0.78rem;
+    }
+
+    .unit-value-table th,
+    .unit-value-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e5ecf5;
+      color: #0f172a;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .unit-value-table th {
+      font-size: 0.68rem;
+      color: #5b6c82;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      background: #f9fbff;
+    }
+
+    .unit-value-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .unit-value-num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .unit-value-name {
+      overflow-wrap: anywhere;
+    }
+
+    .unit-value-bar {
+      position: relative;
+      width: 100%;
+      height: 8px;
+      border-radius: 99px;
+      background: #e7eef8;
+      overflow: hidden;
+    }
+
+    .unit-value-bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #5fa2ff 0%, #2d6cdf 100%);
     }
 
     .unit-core-grid {
@@ -1425,10 +1504,12 @@
         const simAsDefender = units.map((attackerUnit) => simulateMatchupExchange(attackerUnit, u, damageMap));
         const attackValues = units.map((defenderUnit) => ({
           unit: defenderUnit.name,
+          type: defenderUnit.moveType || "Unknown",
           value: rowDamage.get(defenderUnit.key) ?? 0
         }));
         const defenseValues = units.map((attackerUnit) => ({
           unit: attackerUnit.name,
+          type: attackerUnit.moveType || "Unknown",
           value: damageMap.get(attackerUnit.key)?.get(u.key) ?? 0
         }));
         const rawStats = Object.entries(u.rawRow || {}).map(([label, value]) => ({
@@ -1782,13 +1863,80 @@
         ["Utility Notes", row.utilityNotes || "-"]
       ];
 
-      const attackLines = (row.attackValues || [])
-        .map((x) => `${x.unit}: ${x.value}`)
-        .join("\n") || "No attack values.";
+      const normalizeTypeLabel = (value) => {
+        const raw = String(value ?? "").trim();
+        if (!raw) return "Unknown";
+        return raw
+          .split(/[\s_\-/]+/)
+          .filter(Boolean)
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+          .join(" ");
+      };
 
-      const defenseLines = (row.defenseValues || [])
-        .map((x) => `${x.unit}: ${x.value}`)
-        .join("\n") || "No defense values.";
+      const renderGroupedValues = (values) => {
+        const rows = (Array.isArray(values) ? values : [])
+          .map((x) => ({
+            unit: String(x?.unit ?? "-"),
+            type: normalizeTypeLabel(x?.type),
+            value: Number(x?.value) || 0
+          }))
+          .sort((a, b) => b.value - a.value || a.unit.localeCompare(b.unit));
+
+        if (!rows.length) {
+          return "<div class=\"unit-detail-value\">No values available.</div>";
+        }
+
+        const globalMax = rows.reduce((max, x) => Math.max(max, x.value), 0);
+        const groups = new Map();
+
+        rows.forEach((entry) => {
+          const key = entry.type || "Unknown";
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(entry);
+        });
+
+        const groupedEntries = Array.from(groups.entries())
+          .sort((a, b) => a[0].localeCompare(b[0]));
+
+        return `
+          <div class="unit-value-groups">
+            ${groupedEntries.map(([type, items]) => `
+              <article class="unit-value-group">
+                <h4 class="unit-value-group-title">${escapeHtml(type)}</h4>
+                <table class="unit-value-table">
+                  <thead>
+                    <tr>
+                      <th>Unit</th>
+                      <th class="unit-value-num">Raw</th>
+                      <th class="unit-value-num">Norm</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${items.map((item) => {
+                      const normPct = globalMax > 0 ? (item.value / globalMax) * 100 : 0;
+                      return `
+                        <tr>
+                          <td class="unit-value-name">${escapeHtml(item.unit)}</td>
+                          <td class="unit-value-num">${fmt(item.value)}%</td>
+                          <td>
+                            <div class="unit-value-bar" aria-label="normalized-value-bar">
+                              <div class="unit-value-bar-fill" style="width: ${normPct.toFixed(1)}%;"></div>
+                            </div>
+                            <div class="unit-value-num">${normPct.toFixed(1)}%</div>
+                          </td>
+                        </tr>
+                      `;
+                    }).join("")}
+                  </tbody>
+                </table>
+              </article>
+            `).join("")}
+          </div>
+        `;
+      };
+
+      const attackValuesHtml = renderGroupedValues(row.attackValues);
+      const defenseValuesHtml = renderGroupedValues(row.defenseValues);
 
       const weaponFieldPattern = /weapon\s*[12](?:\s*range)?/i;
       const coreStats = (Array.isArray(row.rawStats) ? row.rawStats : []).filter((x) => {
@@ -1862,16 +2010,16 @@
             </article>
 
             <article class="unit-detail-full">
-              <h3 class="unit-section-title">Weapon Attack Values (Damage CSV Row)</h3>
+              <h3 class="unit-section-title">Weapon Attack Values (Grouped by Type)</h3>
               <div class="unit-detail-full-body">
-                <pre class="unit-detail-codeblock">${escapeHtml(attackLines)}</pre>
+                ${attackValuesHtml}
               </div>
             </article>
 
             <article class="unit-detail-full">
-              <h3 class="unit-section-title">Defense Values (Incoming Damage CSV Column)</h3>
+              <h3 class="unit-section-title">Defense Values (Grouped by Type)</h3>
               <div class="unit-detail-full-body">
-                <pre class="unit-detail-codeblock">${escapeHtml(defenseLines)}</pre>
+                ${defenseValuesHtml}
               </div>
             </article>
           </div>
