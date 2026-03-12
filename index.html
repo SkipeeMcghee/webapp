@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.11";
+    window.APP_VERSION = "1.0.12";
   </script>
   <style>
     :root {
@@ -850,6 +850,18 @@
       return distance >= band.min && distance <= band.max;
     }
 
+    function threatMobilityFactor(moveTypeRaw) {
+      const key = normalizeKey(moveTypeRaw);
+      if (key.includes("air")) return 1.5;
+      if (key.includes("tire")) return 1.05;
+      if (key.includes("tread")) return 0.78;
+      if (key.includes("mech")) return 0.9;
+      if (key.includes("infantry")) return 0.72;
+      if (key.includes("lander")) return 0.62;
+      if (key.includes("ship")) return 0.82;
+      return 0.9;
+    }
+
     // Lightweight CSV parser with quoted-field support.
     function parseCsvText(text) {
       const rows = [];
@@ -962,6 +974,7 @@
       const unitNameCol = detectColumn(unitCols, ["name", "unit", "unit name"]) || unitCols[0];
       const costCol = detectColumn(unitCols, ["cost"]);
       const moveCol = detectColumn(unitCols, ["move"]);
+      const moveTypeCol = detectColumn(unitCols, ["move type", "movement type"]);
       const fuelCol = detectColumn(unitCols, ["fuel"]);
       const visionCol = detectColumn(unitCols, ["vision"]);
       const specialCol = detectColumn(unitCols, ["special", "ability", "abilities", "command", "commands"]);
@@ -980,6 +993,7 @@
           const name = String(row[unitNameCol] ?? "").trim();
           const cost = safeNumber(costCol ? row[costCol] : 0);
           const move = safeNumber(moveCol ? row[moveCol] : 0);
+          const moveType = String(moveTypeCol ? row[moveTypeCol] ?? "" : "");
           const fuel = parseFuel(fuelCol ? row[fuelCol] : "");
           const vision = parseVision(visionCol ? row[visionCol] : 0);
           const special = String(specialCol ? row[specialCol] ?? "" : "");
@@ -1000,6 +1014,7 @@
             key: normalizeKey(name),
             cost,
             move,
+            moveType,
             fuel,
             vision,
             special,
@@ -1097,14 +1112,12 @@
         const indirect = maxRange > 1;
         const direct = u.hasDirectOption;
 
-        let setupTax = 0;
-        if (indirect) {
-          if (maxRange <= 3) setupTax = 1.5;
-          else if (maxRange <= 5) setupTax = 2;
-          else setupTax = 2.25;
-        }
+        const canMoveAndFire = maxRange === 1 && u.hasDirectOption;
+        const sameTurnReach = canMoveAndFire ? (u.move + 1) : maxRange;
+        const mobilityFactor = threatMobilityFactor(u.moveType);
 
-        const threatRaw = u.move + maxRange - setupTax;
+        // Only range-1 units can move and attack in one turn.
+        const threatRaw = Math.max(0, (sameTurnReach * mobilityFactor) - (canMoveAndFire ? 0 : 0.8));
 
         const setupModifier = indirect ? (maxRange <= 3 ? 0.88 : maxRange <= 5 ? 0.83 : 0.8) : 1;
         const offensivePressure = costWeightedDamage * setupModifier * targetCoverage;
@@ -1792,3 +1805,4 @@
   </script>
 </body>
 </html>
+
