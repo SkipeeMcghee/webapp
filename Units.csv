@@ -1,0 +1,44 @@
+Unit Name,Cost,Deployed From,Weapon 1,Weapon 1Ammo,Weapon 1 Range,Weapon 2,Move,Move Type,Fuel,Vision,Special Commands,Carry
+Transport Copter,5000,Airport,None,0,0,None,6,Air,99 (-2),2,None,1 Infantry Unit
+Medium Drone,6000,Airport,Rockets,2,1,None,6,Air,99 (-2),3,None,None
+Battle Copter,9000,Airport,Rockets,6,1,M Gun,6,Air,99 (-2),3,None,None
+Heavy Drone,9000,Airport,Rockets,2,1,None,6,Air,99 (-2),3,None,None
+Heavy T Copter,11000,Airport,None,0,0,None,6,Air,99 (-3),2,None,1 Ground Unit
+AWACS,17000,Airport,Jammer,0,1,None,7,Air,99 (-5),7,Support (+Defense),None
+Tanker,18000,Airport,None,0,0,None,6,Air,99 (-5),3,Supply,None
+Fighter,20000,Airport,Missiles,9,1,None,9,Air,99 (-5),2,None,None
+Bomber,22000,Airport,Bombs,9,1,None,7,Air,99 (-5),2,None,None
+Gunship,24000,Airport,Cannon,6,2-3,None,6,Air,99 (-5),3,None,None
+Helicarrier,38000,Airport,Railgun,9,1,None,5,Air,99 (-5),7,Supply,2 Air Units or Jaegars
+Infantry,1000,Factory,None,0,1,M Gun,3,Infantry,99,2 (+3 on Mountains),"Capture, Launch",None
+UGV,2000,Factory,None,0,1,M Gun,4,Treads,99,2,Supply Ground,None
+Light Drone,2000,Factory,Bombs,1,1,None,5,Air,50 (-2),2,None,None
+Truck,2000,Factory,None,0,0,None,6,Tires,60,1,None,1 Infantry Unit
+Mechanized Infantry,3000,Factory,Bazooka,3,1,M Gun,2,Mech,99,2 (+3 on Mountains),"Capture, Launch",None
+Recon,4000,Factory,None,0,1,M Gun,8,Tires,80,5,None,None
+APC,5000,Factory,None,0,0,None,6,Treads,70,1,Supply Ground,1 Infantry Unit
+Excavator,5000,Factory,None,0,0,None,3,Treads,50,1,Excavate,None
+Artillery,6000,Factory,Cannon,9,2-3,None,5,Treads,50,1,None,None
+Light Tank,7000,Factory,Cannon,9,1,M Gun,6,Treads,70,3,None,None
+Heavy Infantry,7000,Factory,Bazooka,4,1,M Gun,3,Mech,99,2 (+3 on Mountains),"Capture, Launch",None
+Anti Air,8000,Factory,AA Gun,9,1,None,6,Treads,60,2,None,None
+IFV,9000,Factory,Cannon,3,1,M Gun,5,Treads,70,2,Supply Ground,1 Infantry Unit
+Jammer,10000,Factory,Jammer,0,1,M Gun,8,Tires,80,5,Support (+Defense),None
+AA Missile Launcher,12000,Factory,Missiles,6,3-5,None,4,Tires,50,5,None,None
+Rocket Launcher,15000,Factory,Rockets,6,3-5,None,5,Tires,50,1,None,None
+Medium Tank,16000,Factory,Cannon,8,1,M Gun,5,Treads,50,1,None,None
+Spider Tank,22000,Factory,Cannon,9,1,M Gun,6,Treads,99,1,None,None
+Walker,26000,Factory,Cannon,6,1,AA Gun,3,Mech,99,4,None,None
+Heavy Tank,28000,Factory,Cannon,3,1,M Gun,4,Treads,50,1,None,None
+Jaeger,36000,Factory,Railgun,6,1,None,6,Mech,99,5,None,None
+Esper,75000,Factory,None,0,1,Psi,9,Air,99,6,"Capture, Launch",1 Ground Unit
+Gunboat,5000,Port,None,4,1,M Gun,5,Ship,99 (-1),4,None,1 Infantry Unit
+Sea Drone,6000,Port,Torpedo,3,1,None,3,Ship,"99 (-1, -5 when Dived)",4,Dive,None
+Corvette,9000,Port,Torpedo,6,1,M Gun,5,Ship,99 (-1),2,None,None
+Lander,12000,Port,None,0,0,None,6,Lander,99 (-1),1,None,2 Ground Units
+Frigate,13000,Port,Cannon,6,2-3,None,6,Ship,99 (-1),3,None,None
+Destroyer,16000,Port,Railgun,9,1,AA Gun,6,Ship,99 (-1),1,None,1 Copter Unit
+Cruiser,18000,Port,Anti Sub Missiles,9,1,AA Gun,6,Ship,99 (-1),3,None,2 Copter Units
+Submarine,20000,Port,Torpedo,6,1,None,5,Ship,"60 (-1, -5 when Dived)",5,Dive,None
+Battleship,28000,Port,Cannon,9,2-6,None,5,Ship,99 (-1),2,None,None
+Aircraft Carrier,30000,Port,Missiles,9,2-7,None,5,Ship,99 (-1),5,Supply,2 Air Units or Jaegars

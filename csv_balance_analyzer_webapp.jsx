@@ -43,6 +43,89 @@ function normalizeKey(s: string): string {
     .trim();
 }
 
+function stripParentheticalName(s: string): string {
+  return normalizeKey(String(s ?? "").replace(/\([^)]*\)/g, " "));
+}
+
+function tokenSet(s: string): Set<string> {
+  return new Set(normalizeKey(s).split(" ").filter(Boolean));
+}
+
+function buildUnitAliasMap(units: Array<{ name: string; key: string }>) {
+  const aliasToKey = new Map<string, string>();
+
+  const addAlias = (alias: string, key: string) => {
+    const normalizedAlias = normalizeKey(alias);
+    if (!normalizedAlias) return;
+    if (!aliasToKey.has(normalizedAlias)) {
+      aliasToKey.set(normalizedAlias, key);
+    }
+  };
+
+  for (const unit of units) {
+    const key = unit.key;
+    const tokens = key.split(" ").filter(Boolean);
+
+    addAlias(unit.name, key);
+    addAlias(stripParentheticalName(unit.name), key);
+    addAlias(key, key);
+
+    if (tokens.length >= 2) {
+      const head = tokens.slice(0, -1);
+      const tail = tokens[tokens.length - 1];
+      const compactInitials = head.map((t) => t[0]).join("");
+      addAlias(`${compactInitials} ${tail}`, key);
+      if (head.length === 1) {
+        addAlias(`${head[0][0]} ${tail}`, key);
+      }
+    }
+
+    if (key === "battle copter") addAlias("b copter", key);
+    if (key === "transport copter") addAlias("t copter", key);
+    if (key === "heavy t copter") {
+      addAlias("ht copter", key);
+      addAlias("h t copter", key);
+    }
+    if (key === "aircraft carrier") addAlias("carrier", key);
+    if (key === "aa missile launcher") addAlias("missiles", key);
+    if (key === "rocket launcher") addAlias("rockets", key);
+    if (key === "submarine") addAlias("sub", key);
+    if (key === "mechanized infantry") addAlias("mech", key);
+  }
+
+  return aliasToKey;
+}
+
+function resolveUnitKey(rawName: string, aliasToKey: Map<string, string>, unitKeys: string[]) {
+  const cleaned = stripParentheticalName(rawName);
+  if (!cleaned) return "";
+
+  const direct = aliasToKey.get(cleaned);
+  if (direct) return direct;
+
+  for (const unitKey of unitKeys) {
+    if (cleaned === unitKey || cleaned.includes(unitKey) || unitKey.includes(cleaned)) {
+      return unitKey;
+    }
+  }
+
+  const sourceTokens = tokenSet(cleaned);
+  let bestKey = "";
+  let bestScore = 0;
+
+  for (const unitKey of unitKeys) {
+    const targetTokens = tokenSet(unitKey);
+    const overlap = [...sourceTokens].filter((token) => targetTokens.has(token)).length;
+    const score = overlap / Math.max(sourceTokens.size, targetTokens.size, 1);
+    if (score > bestScore) {
+      bestScore = score;
+      bestKey = unitKey;
+    }
+  }
+
+  return bestScore >= 0.6 ? bestKey : cleaned;
+}
+
 function detectColumn(columns: string[], patterns: string[]): string | null {
   const normalized = columns.map((c) => ({ raw: c, key: normalizeKey(c) }));
   for (const pattern of patterns) {
@@ -173,20 +256,35 @@ function analyze(unitsRows: any[], damageRows: any[], terrainRows: any[]) {
     };
   }).filter((u) => u.name);
 
-  const unitByKey = new Map(units.map((u) => [u.key, u]));
+  const unitKeys = units.map((u) => u.key);
+  const aliasToKey = buildUnitAliasMap(units);
 
-  const defenders = defenderCols.map((c) => ({
-    raw: c,
-    key: normalizeKey(c),
-    cost: unitByKey.get(normalizeKey(c))?.cost ?? 0,
-  }));
+  const unitByKey = new Map(units.map((u) => [u.key, u]));
+  const unresolvedDefenders = new Set<string>();
+  const unresolvedAttackers = new Set<string>();
+
+  const defenders = defenderCols.map((c) => {
+    const resolvedKey = resolveUnitKey(c, aliasToKey, unitKeys);
+    if (!unitByKey.has(resolvedKey)) {
+      unresolvedDefenders.add(String(c));
+    }
+    return {
+      raw: c,
+      key: resolvedKey,
+      cost: unitByKey.get(resolvedKey)?.cost ?? 0,
+    };
+  });
 
   const damageMap = new Map<string, Map<string, number>>();
 
   for (const row of damageRows) {
     const attackerName = String(row[damageRowNameCol] ?? "").trim();
-    const attackerKey = normalizeKey(attackerName);
+    const attackerKey = resolveUnitKey(attackerName, aliasToKey, unitKeys);
     if (!attackerKey) continue;
+    if (!unitByKey.has(attackerKey)) {
+      unresolvedAttackers.add(attackerName);
+      continue;
+    }
 
     let inner = damageMap.get(attackerKey);
     if (!inner) {
@@ -347,7 +445,17 @@ function analyze(unitsRows: any[], damageRows: any[], terrainRows: any[]) {
     biggestUtility: [...sorted].sort((a, b) => b.utility - a.utility).slice(0, 5),
   };
 
-  return { rows: sorted, summary, meta: { units: units.length, terrainRows: terrainRows.length, damageRows: damageRows.length } };
+  return {
+    rows: sorted,
+    summary,
+    meta: {
+      units: units.length,
+      terrainRows: terrainRows.length,
+      damageRows: damageRows.length,
+      unresolvedAttackers: [...unresolvedAttackers],
+      unresolvedDefenders: [...unresolvedDefenders],
+    },
+  };
 }
 
 function FileDropBox({
@@ -438,6 +546,15 @@ export default function CsvBalanceAnalyzerWebapp() {
   function renderSummary(r: any) {
     const lines = [];
     lines.push(`Loaded ${r.meta.units} units, ${r.meta.terrainRows} terrain rows, and ${r.meta.damageRows} damage rows.`);
+    if ((r.meta.unresolvedAttackers?.length ?? 0) > 0 || (r.meta.unresolvedDefenders?.length ?? 0) > 0) {
+      lines.push(`Unresolved labels: attackers ${r.meta.unresolvedAttackers.length}, defenders ${r.meta.unresolvedDefenders.length}.`);
+      if (r.meta.unresolvedAttackers.length > 0) {
+        lines.push(`  Attackers: ${r.meta.unresolvedAttackers.slice(0, 8).join(", ")}`);
+      }
+      if (r.meta.unresolvedDefenders.length > 0) {
+        lines.push(`  Defenders: ${r.meta.unresolvedDefenders.slice(0, 8).join(", ")}`);
+      }
+    }
     lines.push("");
     lines.push("Top 5 total-score units:");
     r.summary.top5.forEach((u: any, i: number) => {
