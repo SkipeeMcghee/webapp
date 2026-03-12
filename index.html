@@ -287,6 +287,7 @@
             <thead>
               <tr>
                 <th>Unit</th>
+                <th>Grade</th>
                 <th>Role</th>
                 <th>Combat</th>
                 <th>Durability</th>
@@ -574,6 +575,15 @@
       return (value / max) * 100;
     }
 
+    function gradeFromRankPercent(rankPercent) {
+      if (rankPercent >= 0.9) return "S";
+      if (rankPercent >= 0.7) return "A";
+      if (rankPercent >= 0.5) return "B";
+      if (rankPercent >= 0.3) return "C";
+      if (rankPercent >= 0.15) return "D";
+      return "F";
+    }
+
     function parseRangeBand(value) {
       const s = String(value ?? "").trim();
       const nums = (s.match(/\d+/g) || []).map(Number).filter((n) => Number.isFinite(n) && n >= 0);
@@ -826,9 +836,14 @@
 
         const threatRaw = u.move + maxRange - setupTax;
 
-        const returnFirePenalty = direct ? avgIncoming * 0.85 : 0;
         const setupModifier = indirect ? (maxRange <= 3 ? 0.88 : maxRange <= 5 ? 0.83 : 0.8) : 1;
-        const combatExchangeRaw = Math.max(0, (costWeightedDamage * setupModifier) - returnFirePenalty);
+        const offensivePressure = costWeightedDamage * setupModifier;
+        const returnFirePenalty = direct
+          ? Math.min(avgIncoming * 0.35, offensivePressure * 0.85)
+          : 0;
+        const combatExchangeRaw = offensivePressure > 0
+          ? Math.max(offensivePressure * 0.05, offensivePressure - returnFirePenalty)
+          : 0;
 
         const turnEndurance = u.fuel.normalDrain > 0 ? u.fuel.fuelMax / u.fuel.normalDrain : u.fuel.fuelMax;
         const movementBudget = u.move * (turnEndurance || 0);
@@ -923,12 +938,19 @@
       });
 
       const sorted = [...scored].sort((a, b) => b.total - a.total);
+      const graded = sorted.map((row, idx, arr) => {
+        const rankPercent = arr.length <= 1 ? 1 : 1 - idx / (arr.length - 1);
+        return {
+          ...row,
+          grade: gradeFromRankPercent(rankPercent)
+        };
+      });
 
       const summary = {
-        top5: sorted.slice(0, 5),
-        bottom5: [...sorted].slice(-5).reverse(),
-        biggestCombat: [...sorted].sort((a, b) => b.combat - a.combat).slice(0, 5),
-        biggestUtility: [...sorted].sort((a, b) => b.utility - a.utility).slice(0, 5)
+        top5: graded.slice(0, 5),
+        bottom5: [...graded].slice(-5).reverse(),
+        biggestCombat: [...graded].sort((a, b) => b.combat - a.combat).slice(0, 5),
+        biggestUtility: [...graded].sort((a, b) => b.utility - a.utility).slice(0, 5)
       };
 
       const damageTable = {};
@@ -948,7 +970,7 @@
       }));
 
       return {
-        rows: sorted,
+        rows: graded,
         summary,
         meta: {
           units: units.length,
@@ -977,7 +999,7 @@
       lines.push("");
       lines.push("Top 5 total-score units:");
       r.summary.top5.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} - total ${u.total.toFixed(1)}, combat ${u.combat.toFixed(1)}, threat ${u.threat.toFixed(1)}, endurance ${u.endurance.toFixed(1)}, vision ${u.vision.toFixed(1)}, utility ${u.utility.toFixed(1)}.`);
+        lines.push(`${i + 1}. ${u.unit} [${u.grade}] - total ${u.total.toFixed(1)}, combat ${u.combat.toFixed(1)}, threat ${u.threat.toFixed(1)}, endurance ${u.endurance.toFixed(1)}, vision ${u.vision.toFixed(1)}, utility ${u.utility.toFixed(1)}.`);
       });
       lines.push("");
       lines.push("Top 5 combat-exchange units:");
@@ -992,7 +1014,7 @@
       lines.push("");
       lines.push("Bottom 5 total-score units:");
       r.summary.bottom5.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} - total ${u.total.toFixed(1)}.`);
+        lines.push(`${i + 1}. ${u.unit} [${u.grade}] - total ${u.total.toFixed(1)}.`);
       });
       return lines.join("\n");
     }
@@ -1001,6 +1023,7 @@
       scoresBody.innerHTML = rows.map((row) => `
         <tr>
           <td><strong>${escapeHtml(row.unit)}</strong></td>
+          <td><strong>${escapeHtml(row.grade)}</strong></td>
           <td>${escapeHtml(row.role)}</td>
           <td>${row.combat.toFixed(1)}</td>
           <td>${row.durability.toFixed(1)}</td>
