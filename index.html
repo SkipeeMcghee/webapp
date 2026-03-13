@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.16";
+    window.APP_VERSION = "1.1.17";
   </script>
   <style>
     :root {
@@ -716,6 +716,27 @@
 
     .unit-value-name {
       overflow-wrap: anywhere;
+    }
+
+    .unit-value-link {
+      appearance: none;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      margin: 0;
+      font: inherit;
+      font-weight: 800;
+      text-align: left;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .unit-value-link:focus-visible {
+      outline: 2px solid #60a5fa;
+      outline-offset: 2px;
+      border-radius: 4px;
     }
 
     .unit-value-bar {
@@ -2150,6 +2171,7 @@
         const rows = (Array.isArray(values) ? values : [])
           .map((x) => ({
             unit: String(x?.unit ?? "-"),
+            linkedUnitKey: String(x?.counterpartKey ?? ""),
             counterpartKey: String(x?.counterpartKey ?? ""),
             type: normalizeTypeLabel(x?.type),
             value: Number(x?.value) || 0
@@ -2271,7 +2293,7 @@
                       const rowBg = gradeBgForLetter(item.grade);
                       return `
                         <tr class="unit-value-row ${gradeClass}" style="background:${rowBg};">
-                          <td class="unit-value-name" style="background:${rowBg};">${escapeHtml(item.unit)}</td>
+                          <td class="unit-value-name" style="background:${rowBg};"><button type="button" class="unit-value-link" data-detail-unit-key="${escapeHtml(item.linkedUnitKey)}">${escapeHtml(item.unit)}</button></td>
                           <td class="unit-value-num" style="background:${rowBg};">${fmt(item.value)}% (${item.grade})</td>
                           <td style="background:${rowBg};">
                             <div class="unit-value-bar" aria-label="normalized-value-bar">
@@ -2390,6 +2412,15 @@
           </div>
         </div>
       `;
+
+      unitDetailGrid.querySelectorAll("[data-detail-unit-key]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const targetKey = button.getAttribute("data-detail-unit-key") || "";
+          if (!targetKey || targetKey === row.key) return;
+          renderUnitDetail(targetKey);
+          unitDetailSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
 
       unitDetailSection.style.display = "block";
     }
