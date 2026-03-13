@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.2";
+    window.APP_VERSION = "1.1.3";
   </script>
   <style>
     :root {
@@ -1531,11 +1531,13 @@
         const simAsDefender = units.map((attackerUnit) => simulateMatchupExchange(attackerUnit, u, damageMap));
         const attackValues = units.map((defenderUnit) => ({
           unit: defenderUnit.name,
+          counterpartKey: defenderUnit.key,
           type: defenderUnit.moveType || "Unknown",
           value: rowDamage.get(defenderUnit.key) ?? 0
         }));
         const defenseValues = units.map((attackerUnit) => ({
           unit: attackerUnit.name,
+          counterpartKey: attackerUnit.key,
           type: attackerUnit.moveType || "Unknown",
           value: damageMap.get(attackerUnit.key)?.get(u.key) ?? 0
         }));
@@ -1907,10 +1909,11 @@
           .join(" ");
       };
 
-      const renderGroupedValues = (values) => {
+      const renderGroupedValues = (values, mode) => {
         const rows = (Array.isArray(values) ? values : [])
           .map((x) => ({
             unit: String(x?.unit ?? "-"),
+            counterpartKey: String(x?.counterpartKey ?? ""),
             type: normalizeTypeLabel(x?.type),
             value: Number(x?.value) || 0
           }))
@@ -1930,11 +1933,31 @@
           if (g === "D") return "grade-d";
           return "grade-f";
         };
-        const gradedRows = rows.map((entry, idx, arr) => {
-          const rankPercent = arr.length <= 1 ? 1 : 1 - idx / (arr.length - 1);
+
+        // Grade each value against the full roster for the same counterpart matchup.
+        const computeRosterGrade = (entry) => {
+          const comparisonValues = (state.result?.rows || []).map((candidate) => {
+            const sourceValues = mode === "defense" ? candidate.defenseValues : candidate.attackValues;
+            const hit = (Array.isArray(sourceValues) ? sourceValues : []).find(
+              (v) => String(v?.counterpartKey ?? "") === entry.counterpartKey
+            );
+            return Number(hit?.value) || 0;
+          });
+
+          if (!comparisonValues.length) return "F";
+
+          const greaterCount = comparisonValues.filter((v) => v > entry.value).length;
+          const rankPercent = comparisonValues.length <= 1
+            ? 1
+            : 1 - greaterCount / (comparisonValues.length - 1);
+
+          return gradeFromRankPercent(rankPercent);
+        };
+
+        const gradedRows = rows.map((entry) => {
           return {
             ...entry,
-            grade: gradeFromRankPercent(rankPercent)
+            grade: computeRosterGrade(entry)
           };
         });
         const groups = new Map();
@@ -1988,8 +2011,8 @@
         `;
       };
 
-      const attackValuesHtml = renderGroupedValues(row.attackValues);
-      const defenseValuesHtml = renderGroupedValues(row.defenseValues);
+      const attackValuesHtml = renderGroupedValues(row.attackValues, "attack");
+      const defenseValuesHtml = renderGroupedValues(row.defenseValues, "defense");
       const sharedWeaponRange = row.weapon1RangeRaw || row.weapon2RangeRaw || "-";
 
       const weaponFieldPattern = /weapon\s*[12](?:\s*range)?/i;
