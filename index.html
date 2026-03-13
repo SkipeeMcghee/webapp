@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.12";
+    window.APP_VERSION = "1.1.13";
   </script>
   <style>
     :root {
@@ -176,19 +176,20 @@
       background: white;
     }
 
-    .roster-table-wrap {
-      max-height: 520px;
-      overflow: auto;
+    .roster-groups {
+      display: grid;
+      gap: 12px;
+    }
+
+    .roster-group {
       border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: white;
+      border-radius: 12px;
+      background: #ffffff;
+      overflow: hidden;
     }
 
-    .roster-table {
-      min-width: 680px;
-    }
-
-    .roster-group-row td {
+    .roster-group-head {
+      padding: 8px 10px;
       background: #eef2f7;
       color: #0f172a;
       font-weight: 800;
@@ -198,13 +199,56 @@
       border-bottom: 1px solid #d7dee8;
     }
 
+    .roster-group-grid {
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .roster-unit-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #f8fafc;
+      padding: 8px;
+      display: grid;
+      gap: 6px;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+    }
+
+    .roster-unit-name {
+      font-size: 0.9rem;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.2;
+      overflow-wrap: anywhere;
+    }
+
+    .roster-unit-meta {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .roster-chip {
+      font-size: 0.74rem;
+      border-radius: 999px;
+      padding: 2px 7px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #334155;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
     .roster-icon {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 44px;
-      padding: 3px 8px;
-      border-radius: 999px;
+      min-width: 48px;
+      padding: 4px 8px;
+      border-radius: 10px;
       border: 1px solid #c7d2e2;
       background: #f8fafc;
       color: #0f172a;
@@ -768,6 +812,7 @@
     @media (max-width: 640px) {
       .unit-core-weapons { grid-template-columns: 1fr; }
       .unit-core-weapon-combo { grid-template-columns: 1fr; }
+      .roster-group-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -829,20 +874,7 @@
     <section id="rosterSection" class="card" style="display: none;">
       <h2 style="margin: 0 0 8px; font-size: 1.05rem;">Unit Roster (By Building, Cost Asc)</h2>
       <div id="rosterMeta" class="small-note" style="margin-bottom: 10px;">-</div>
-      <div class="roster-table-wrap">
-        <table class="roster-table">
-          <thead>
-            <tr>
-              <th>Icon</th>
-              <th>Unit</th>
-              <th>Deployed From</th>
-              <th>Cost</th>
-              <th>Role</th>
-            </tr>
-          </thead>
-          <tbody id="rosterBody"></tbody>
-        </table>
-      </div>
+      <div id="rosterBody" class="roster-groups"></div>
     </section>
 
     <section id="unitDetailSection" class="card" style="display: none;">
@@ -1975,26 +2007,29 @@
           return String(a.unit || "").localeCompare(String(b.unit || ""));
         });
 
-        const groupRow = `
-          <tr class="roster-group-row">
-            <td colspan="5">${escapeHtml(group)} (${sortedUnits.length})</td>
-          </tr>
-        `;
-
-        const unitRows = sortedUnits.map((row) => {
+        const unitCards = sortedUnits.map((row) => {
           const icon = unitGlyph(row.unit).trim() || "???";
+          const cost = Math.round(Number(row.cost) || 0);
           return `
-            <tr>
-              <td><span class="roster-icon">${escapeHtml(icon)}</span></td>
-              <td>${escapeHtml(row.unit || "-")}</td>
-              <td>${escapeHtml(group)}</td>
-              <td class="unit-value-num">${Math.round(Number(row.cost) || 0)}</td>
-              <td>${escapeHtml(row.role || "-")}</td>
-            </tr>
+            <article class="roster-unit-card">
+              <span class="roster-icon">${escapeHtml(icon)}</span>
+              <div>
+                <div class="roster-unit-name">${escapeHtml(row.unit || "-")}</div>
+                <div class="roster-unit-meta">
+                  <span class="roster-chip">Cost ${cost}</span>
+                  <span class="roster-chip">${escapeHtml(row.role || "-")}</span>
+                </div>
+              </div>
+            </article>
           `;
         }).join("");
 
-        return `${groupRow}${unitRows}`;
+        return `
+          <section class="roster-group">
+            <div class="roster-group-head">${escapeHtml(group)} (${sortedUnits.length})</div>
+            <div class="roster-group-grid">${unitCards}</div>
+          </section>
+        `;
       }).join("");
 
       rosterBody.innerHTML = html;
