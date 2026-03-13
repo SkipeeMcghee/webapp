@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.15";
+    window.APP_VERSION = "1.1.16";
   </script>
   <style>
     :root {
@@ -584,6 +584,12 @@
     .unit-detail-micro .unit-detail-value {
       font-size: 0.82rem;
       font-weight: 700;
+    }
+
+    .unit-detail-justification {
+      white-space: pre-wrap;
+      line-height: 1.35;
+      font-weight: 600;
     }
 
     .unit-detail-full {
@@ -2082,18 +2088,43 @@
         ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`]
       ];
 
-      const profileDetails = [
-        ["Role", row.role],
-        ["Best Range", rangeBand],
-        ["Direct Fire", row.hasDirectOption ? "Yes" : "No"],
-        ["Cost", `${Math.round(row.cost || 0)}`],
-        ["Move", fmt(row.move)],
-        ["Move Type", row.moveType || "-"],
-        ["Avg Outgoing", fmt(row.avgDamage)],
-        ["Avg Incoming", fmt(row.avgIncoming)],
-        ["Target Coverage", `${fmt((row.targetCoverage || 0) * 100)}%`],
-        ["Cost-Weighted Damage", fmt(row.costWeightedDamage)],
-        ["Utility Notes", row.utilityNotes || "-"]
+      const findRawStatValue = (patterns, fallback = "-") => {
+        const hit = (Array.isArray(row.rawStats) ? row.rawStats : []).find((entry) => {
+          const label = normalizeKey(entry?.label ?? "");
+          return patterns.some((pattern) => label === normalizeKey(pattern) || label.includes(normalizeKey(pattern)));
+        });
+        const value = String(hit?.value ?? "").trim();
+        return value || fallback;
+      };
+
+      const sameTurnReach = row.bestMaxRange === 1 && row.hasDirectOption
+        ? (Number(row.move) || 0) + 1
+        : Number(row.bestMaxRange) || 0;
+      const scoreJustifications = [
+        [
+          "Combat",
+          `Score ${fmt(row.combat)} (${row.combatGrade || "-"})\nAvg outgoing ${fmt(row.avgDamage)}%\nCost-weighted damage ${fmt(row.costWeightedDamage)}\nTarget coverage ${fmt((row.targetCoverage || 0) * 100)}%`
+        ],
+        [
+          "Durability",
+          `Score ${fmt(row.durability)} (${row.durabilityGrade || "-"})\nAvg incoming ${fmt(row.avgIncoming)}%\nDefense values grade against each attacker on the matrix.`
+        ],
+        [
+          "Threat",
+          `Score ${fmt(row.threat)} (${row.threatGrade || "-"})\nSame-turn reach ${fmt(sameTurnReach)}\nBest range ${rangeBand}\nDirect fire ${row.hasDirectOption ? "Yes" : "No"}`
+        ],
+        [
+          "Endurance",
+          `Score ${fmt(row.endurance)} (${row.enduranceGrade || "-"})\nFuel profile ${findRawStatValue(["fuel"])}\nSustained movement and uptime drive this score.`
+        ],
+        [
+          "Vision",
+          `Score ${fmt(row.vision)} (${row.visionGrade || "-"})\nVision stat ${findRawStatValue(["vision"])}\nFog utility is derived from base plus bonus vision.`
+        ],
+        [
+          "Utility",
+          `Score ${fmt(row.utility)} (${row.utilityGrade || "-"})\nSpecials ${findRawStatValue(["special commands", "special", "commands"])}\nCarry ${findRawStatValue(["carry", "transport", "capacity", "cargo"])}\nNotes ${row.utilityNotes || "-"}`
+        ]
       ];
 
       const normalizeTypeLabel = (value) => {
@@ -2315,6 +2346,10 @@
                   </article>
                 </div>
                 <div class="unit-core-grid">
+                  <article class="unit-core-item">
+                    <div class="unit-detail-label">Direct Fire</div>
+                    <div class="unit-detail-value">${row.hasDirectOption ? "Yes" : "No"}</div>
+                  </article>
                   ${coreStats.length
                     ? coreStats.map((x) => `
                       <article class="unit-core-item">
@@ -2330,10 +2365,10 @@
             <article class="unit-section">
               <h3 class="unit-section-title">Secondary Details</h3>
               <div class="unit-section-body">
-                ${profileDetails.map(([label, value]) => `
+                ${scoreJustifications.map(([label, value]) => `
                   <article class="unit-detail-micro">
                     <div class="unit-detail-label">${escapeHtml(label)}</div>
-                    <div class="unit-detail-value">${escapeHtml(String(value))}</div>
+                    <div class="unit-detail-value unit-detail-justification">${escapeHtml(String(value))}</div>
                   </article>
                 `).join("")}
               </div>
