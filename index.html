@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.8";
+    window.APP_VERSION = "1.1.9";
   </script>
   <style>
     :root {
@@ -572,7 +572,7 @@
     }
 
     .unit-value-row.grade-s,
-    .unit-value-row.grade-s td { background: #ddd6fe !important; }
+    .unit-value-row.grade-s td { background: #a78bfa !important; color: #2e1065 !important; }
     .unit-value-row.grade-a,
     .unit-value-row.grade-a td { background: #93c5fd !important; }
     .unit-value-row.grade-b,
@@ -594,6 +594,12 @@
       font-weight: 800;
       line-height: 1.1;
       border: 1px solid currentColor;
+    }
+
+    .unit-grade-pill.grade-s {
+      background: #8b5cf6;
+      color: #ffffff;
+      border-color: #6d28d9;
     }
 
     .unit-value-num {
@@ -695,7 +701,7 @@
       word-break: break-word;
     }
 
-    .grade-s { background: #ddd6fe; color: #5b21b6; }
+    .grade-s { background: #a78bfa; color: #2e1065; }
     .grade-a { background: #93c5fd; color: #1d4ed8; }
     .grade-b { background: #99f6e4; color: #0f766e; }
     .grade-c { background: #86efac; color: #166534; }
@@ -1941,7 +1947,7 @@
         };
         const gradeBgForLetter = (grade) => {
           const g = String(grade || "").toUpperCase();
-          if (g === "S") return "#ddd6fe";
+          if (g === "S") return "#a78bfa";
           if (g === "A") return "#93c5fd";
           if (g === "B") return "#99f6e4";
           if (g === "C") return "#86efac";
