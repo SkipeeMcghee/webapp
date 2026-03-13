@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.11";
+    window.APP_VERSION = "1.1.12";
   </script>
   <style>
     :root {
@@ -174,6 +174,44 @@
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       background: white;
+    }
+
+    .roster-table-wrap {
+      max-height: 520px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: white;
+    }
+
+    .roster-table {
+      min-width: 680px;
+    }
+
+    .roster-group-row td {
+      background: #eef2f7;
+      color: #0f172a;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      font-size: 0.76rem;
+      border-bottom: 1px solid #d7dee8;
+    }
+
+    .roster-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid #c7d2e2;
+      background: #f8fafc;
+      color: #0f172a;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.8rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
     }
 
     table {
@@ -788,6 +826,25 @@
       </article>
     </section>
 
+    <section id="rosterSection" class="card" style="display: none;">
+      <h2 style="margin: 0 0 8px; font-size: 1.05rem;">Unit Roster (By Building, Cost Asc)</h2>
+      <div id="rosterMeta" class="small-note" style="margin-bottom: 10px;">-</div>
+      <div class="roster-table-wrap">
+        <table class="roster-table">
+          <thead>
+            <tr>
+              <th>Icon</th>
+              <th>Unit</th>
+              <th>Deployed From</th>
+              <th>Cost</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody id="rosterBody"></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="unitDetailSection" class="card" style="display: none;">
       <h2 style="margin: 0 0 8px; font-size: 1.05rem;">Unit Detail View</h2>
       <div id="unitDetailTitle" style="font-weight: 700; font-size: 1rem;">Select a unit from the Unit Scores table.</div>
@@ -906,6 +963,9 @@
     const doneBadge = document.getElementById("doneBadge");
     const errorBox = document.getElementById("errorBox");
     const resultSection = document.getElementById("resultSection");
+    const rosterSection = document.getElementById("rosterSection");
+    const rosterMeta = document.getElementById("rosterMeta");
+    const rosterBody = document.getElementById("rosterBody");
     const unitDetailSection = document.getElementById("unitDetailSection");
     const unitDetailTitle = document.getElementById("unitDetailTitle");
     const unitDetailMeta = document.getElementById("unitDetailMeta");
@@ -1416,6 +1476,7 @@
       const fuelCol = detectColumn(unitCols, ["fuel"]);
       const visionCol = detectColumn(unitCols, ["vision"]);
       const specialCol = detectColumn(unitCols, ["special", "ability", "abilities", "command", "commands"]);
+      const deployedFromCol = detectColumn(unitCols, ["deployed from", "deploy from", "deployed", "deployment", "built from", "build"]);
       const carryCol = detectColumn(unitCols, ["carry", "transport", "capacity", "cargo"]);
       const weapon1Col = detectExactColumn(unitCols, ["weapon 1", "weapon1"]);
       const weapon2Col = detectExactColumn(unitCols, ["weapon 2", "weapon2"]);
@@ -1436,6 +1497,7 @@
           const fuel = parseFuel(fuelCol ? row[fuelCol] : "");
           const vision = parseVision(visionCol ? row[visionCol] : 0);
           const special = String(specialCol ? row[specialCol] ?? "" : "");
+          const deployedFrom = String(deployedFromCol ? row[deployedFromCol] ?? "" : "");
           const abilityScore = scoreAbilities(special);
           const carryInfo = parseCarryInfo(carryCol ? row[carryCol] : "");
           const transportScore = scoreTransport(carryInfo);
@@ -1458,6 +1520,7 @@
             fuel,
             vision,
             special,
+            deployedFrom,
             abilityScore,
             carryInfo,
             transportScore,
@@ -1616,6 +1679,7 @@
           unit: u.name,
           key: u.key,
           role,
+          deployedFrom: u.deployedFrom || "Unknown",
           cost: u.cost,
           move: u.move,
           moveType: u.moveType,
@@ -1874,6 +1938,68 @@
           unitDetailSection.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       });
+    }
+
+    function renderRoster(rows) {
+      const allRows = Array.isArray(rows) ? rows : [];
+      const normalizeDeployGroup = (value) => {
+        const key = normalizeKey(value);
+        if (key.includes("airport")) return "Airport";
+        if (key.includes("port")) return "Port";
+        if (key.includes("factory")) return "Factory";
+        return value && String(value).trim() ? String(value).trim() : "Unknown";
+      };
+
+      const groupOrder = ["Factory", "Airport", "Port"];
+      const grouped = new Map();
+
+      allRows.forEach((row) => {
+        const group = normalizeDeployGroup(row.deployedFrom);
+        if (!grouped.has(group)) grouped.set(group, []);
+        grouped.get(group).push(row);
+      });
+
+      const orderedGroups = Array.from(grouped.entries()).sort((a, b) => {
+        const ai = groupOrder.indexOf(a[0]);
+        const bi = groupOrder.indexOf(b[0]);
+        const aRank = ai === -1 ? 999 : ai;
+        const bRank = bi === -1 ? 999 : bi;
+        if (aRank !== bRank) return aRank - bRank;
+        return a[0].localeCompare(b[0]);
+      });
+
+      const html = orderedGroups.map(([group, units]) => {
+        const sortedUnits = [...units].sort((a, b) => {
+          const costDiff = (a.cost ?? 0) - (b.cost ?? 0);
+          if (costDiff !== 0) return costDiff;
+          return String(a.unit || "").localeCompare(String(b.unit || ""));
+        });
+
+        const groupRow = `
+          <tr class="roster-group-row">
+            <td colspan="5">${escapeHtml(group)} (${sortedUnits.length})</td>
+          </tr>
+        `;
+
+        const unitRows = sortedUnits.map((row) => {
+          const icon = unitGlyph(row.unit).trim() || "???";
+          return `
+            <tr>
+              <td><span class="roster-icon">${escapeHtml(icon)}</span></td>
+              <td>${escapeHtml(row.unit || "-")}</td>
+              <td>${escapeHtml(group)}</td>
+              <td class="unit-value-num">${Math.round(Number(row.cost) || 0)}</td>
+              <td>${escapeHtml(row.role || "-")}</td>
+            </tr>
+          `;
+        }).join("");
+
+        return `${groupRow}${unitRows}`;
+      }).join("");
+
+      rosterBody.innerHTML = html;
+      rosterMeta.textContent = `${allRows.length} units grouped by deployment building, sorted by cost (low to high).`;
+      rosterSection.style.display = "block";
     }
 
     function renderUnitDetail(unitKey) {
@@ -2538,6 +2664,7 @@
 
       summaryText.value = renderSummary(analyzed);
       renderTable(analyzed.rows);
+      renderRoster(analyzed.rows);
       if (analyzed.rows.length) {
         renderUnitDetail(analyzed.rows[0].key);
       }
@@ -2566,6 +2693,7 @@
         await runAnalysisFromRows(unitsRows, terrainRows, damageRows, "Analysis complete");
       } catch (error) {
         resultSection.style.display = "none";
+        rosterSection.style.display = "none";
         unitDetailSection.style.display = "none";
         setError(error?.message || "Failed to analyze files.");
       } finally {
@@ -2592,6 +2720,7 @@
         await runAnalysisFromRows(unitsRows, terrainRows, damageRows, "Analysis complete (dev files)");
       } catch (error) {
         resultSection.style.display = "none";
+        rosterSection.style.display = "none";
         unitDetailSection.style.display = "none";
         setError(error?.message || "Failed to run bundled dev analysis.");
       } finally {
