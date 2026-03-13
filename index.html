@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.10";
+    window.APP_VERSION = "1.1.11";
   </script>
   <style>
     :root {
@@ -574,7 +574,7 @@
     .unit-value-row.grade-s,
     .unit-value-row.grade-s td { background: #ddd6fe !important; color: #4c1d95 !important; }
     .unit-value-row.grade-a,
-    .unit-value-row.grade-a td { background: #bfdbfe !important; }
+    .unit-value-row.grade-a td { background: #a7d3ff !important; color: #1e3a8a !important; }
     .unit-value-row.grade-b,
     .unit-value-row.grade-b td { background: #ccfbf1 !important; }
     .unit-value-row.grade-c,
@@ -600,6 +600,12 @@
       background: #c4b5fd;
       color: #4c1d95;
       border-color: #7c3aed;
+    }
+
+    .unit-grade-pill.grade-a {
+      background: #60a5fa;
+      color: #ffffff;
+      border-color: #2563eb;
     }
 
     .unit-value-num {
@@ -702,7 +708,7 @@
     }
 
     .grade-s { background: #ddd6fe; color: #4c1d95; }
-    .grade-a { background: #bfdbfe; color: #1e40af; }
+    .grade-a { background: #a7d3ff; color: #1e3a8a; }
     .grade-b { background: #ccfbf1; color: #0f766e; }
     .grade-c { background: #bbf7d0; color: #166534; }
     .grade-d { background: #fef3c7; color: #92400e; }
@@ -1948,7 +1954,7 @@
         const gradeBgForLetter = (grade) => {
           const g = String(grade || "").toUpperCase();
           if (g === "S") return "#ddd6fe";
-          if (g === "A") return "#bfdbfe";
+          if (g === "A") return "#a7d3ff";
           if (g === "B") return "#ccfbf1";
           if (g === "C") return "#bbf7d0";
           if (g === "D") return "#fef3c7";
