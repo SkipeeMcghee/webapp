@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.5";
+    window.APP_VERSION = "1.1.6";
   </script>
   <style>
     :root {
@@ -571,12 +571,18 @@
       border-bottom: 0;
     }
 
-    .unit-value-row.grade-s { background: #f3e8ff; }
-    .unit-value-row.grade-a { background: #e0e7ff; }
-    .unit-value-row.grade-b { background: #dbeafe; }
-    .unit-value-row.grade-c { background: #dcfce7; }
-    .unit-value-row.grade-d { background: #fef9c3; }
-    .unit-value-row.grade-f { background: #fee2e2; }
+    .unit-value-row.grade-s,
+    .unit-value-row.grade-s td { background: #f3e8ff; }
+    .unit-value-row.grade-a,
+    .unit-value-row.grade-a td { background: #e0e7ff; }
+    .unit-value-row.grade-b,
+    .unit-value-row.grade-b td { background: #dbeafe; }
+    .unit-value-row.grade-c,
+    .unit-value-row.grade-c td { background: #dcfce7; }
+    .unit-value-row.grade-d,
+    .unit-value-row.grade-d td { background: #fef9c3; }
+    .unit-value-row.grade-f,
+    .unit-value-row.grade-f td { background: #fee2e2; }
 
     .unit-grade-pill {
       display: inline-block;
@@ -1937,7 +1943,6 @@
         // Grade each value against the full roster for the same counterpart matchup.
         const computeRosterGrade = (entry) => {
           const value = Number(entry?.value) || 0;
-          if (value <= 0) return "F";
 
           const comparisonValues = (state.result?.rows || []).map((candidate) => {
             const sourceValues = mode === "defense" ? candidate.defenseValues : candidate.attackValues;
@@ -1949,21 +1954,44 @@
 
           if (!comparisonValues.length) return "F";
 
-          const positiveValues = comparisonValues.filter((v) => Number.isFinite(v) && v > 0);
-          if (!positiveValues.length) return "F";
+          // Attack table: higher damage is better for the selected unit.
+          if (mode !== "defense") {
+            if (value <= 0) return "F";
+            const positiveValues = comparisonValues.filter((v) => Number.isFinite(v) && v > 0);
+            if (!positiveValues.length) return "F";
 
-          const maxValue = Math.max(...positiveValues);
-          if (Math.abs(value - maxValue) < 1e-9) return "S";
+            const maxValue = Math.max(...positiveValues);
+            if (Math.abs(value - maxValue) < 1e-9) return "S";
 
-          // Deterministic ranking with tie stability: equal values share the same tier.
-          const uniqueSorted = Array.from(new Set(positiveValues.map((v) => Number(v.toFixed(6))))).sort((a, b) => b - a);
+            const uniqueSortedDesc = Array.from(new Set(positiveValues.map((v) => Number(v.toFixed(6))))).sort((a, b) => b - a);
+            const roundedValue = Number(value.toFixed(6));
+            const rankIndex = uniqueSortedDesc.indexOf(roundedValue);
+            if (rankIndex < 0) return "F";
+
+            const rankPercent = uniqueSortedDesc.length <= 1
+              ? 1
+              : 1 - rankIndex / (uniqueSortedDesc.length - 1);
+
+            return gradeFromRankPercent(rankPercent);
+          }
+
+          // Defense table: lower incoming damage is better for the selected unit.
+          const nonNegativeValues = comparisonValues
+            .filter((v) => Number.isFinite(v) && v >= 0)
+            .map((v) => Number(v.toFixed(6)));
+          if (!nonNegativeValues.length) return "F";
+
+          const minValue = Math.min(...nonNegativeValues);
+          if (Math.abs(Number(value.toFixed(6)) - minValue) < 1e-9) return "S";
+
+          const uniqueSortedAsc = Array.from(new Set(nonNegativeValues)).sort((a, b) => a - b);
           const roundedValue = Number(value.toFixed(6));
-          const rankIndex = uniqueSorted.indexOf(roundedValue);
+          const rankIndex = uniqueSortedAsc.indexOf(roundedValue);
           if (rankIndex < 0) return "F";
 
-          const rankPercent = uniqueSorted.length <= 1
+          const rankPercent = uniqueSortedAsc.length <= 1
             ? 1
-            : 1 - rankIndex / (uniqueSorted.length - 1);
+            : 1 - rankIndex / (uniqueSortedAsc.length - 1);
 
           return gradeFromRankPercent(rankPercent);
         };
@@ -2006,7 +2034,7 @@
                       return `
                         <tr class="unit-value-row ${gradeClass}">
                           <td class="unit-value-name">${escapeHtml(item.unit)}</td>
-                          <td class="unit-value-num">${fmt(item.value)}%</td>
+                          <td class="unit-value-num">${fmt(item.value)}% (${item.grade})</td>
                           <td>
                             <div class="unit-value-bar" aria-label="normalized-value-bar">
                               <div class="unit-value-bar-fill" style="width: ${normPct.toFixed(1)}%;"></div>
