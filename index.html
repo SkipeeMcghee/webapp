@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.14";
+    window.APP_VERSION = "1.1.15";
   </script>
   <style>
     :root {
@@ -2193,14 +2193,11 @@
           const minValue = Math.min(...nonNegativeValues);
           if (Math.abs(Number(value.toFixed(6)) - minValue) < 1e-9) return "S";
 
-          const uniqueSortedAsc = Array.from(new Set(nonNegativeValues)).sort((a, b) => a - b);
           const roundedValue = Number(value.toFixed(6));
-          const rankIndex = uniqueSortedAsc.indexOf(roundedValue);
-          if (rankIndex < 0) return "F";
-
-          const rankPercent = uniqueSortedAsc.length <= 1
+          const betterCount = nonNegativeValues.filter((v) => v < roundedValue).length;
+          const rankPercent = nonNegativeValues.length <= 1
             ? 1
-            : 1 - rankIndex / (uniqueSortedAsc.length - 1);
+            : 1 - betterCount / (nonNegativeValues.length - 1);
 
           return gradeFromRankPercent(rankPercent);
         };
