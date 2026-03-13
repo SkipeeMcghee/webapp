@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.0.26";
+    window.APP_VERSION = "1.1.0";
   </script>
   <style>
     :root {
@@ -1862,12 +1862,6 @@
         ["Cost", `${Math.round(row.cost || 0)}`],
         ["Move", fmt(row.move)],
         ["Move Type", row.moveType || "-"],
-        ["Weapon 1", row.weapon1Name || "-"],
-        ["Weapon 1 Ammo", row.ammo1Raw || "-"],
-        ["Weapon 1 Range", row.weapon1RangeRaw || "-"],
-        ["Weapon 2", row.weapon2Name || "-"],
-        ["Weapon 2 Ammo", row.ammo2Raw || "-"],
-        ["Weapon 2 Range", row.weapon2RangeRaw || "-"],
         ["Avg Outgoing", fmt(row.avgDamage)],
         ["Avg Incoming", fmt(row.avgIncoming)],
         ["Target Coverage", `${fmt((row.targetCoverage || 0) * 100)}%`],
@@ -1908,9 +1902,25 @@
         }
 
         const globalMax = rows.reduce((max, x) => Math.max(max, x.value), 0);
+        const gradeClassForLetter = (grade) => {
+          const g = String(grade || "").toUpperCase();
+          if (g === "S") return "grade-s";
+          if (g === "A") return "grade-a";
+          if (g === "B") return "grade-b";
+          if (g === "C") return "grade-c";
+          if (g === "D") return "grade-d";
+          return "grade-f";
+        };
+        const gradedRows = rows.map((entry, idx, arr) => {
+          const rankPercent = arr.length <= 1 ? 1 : 1 - idx / (arr.length - 1);
+          return {
+            ...entry,
+            grade: gradeFromRankPercent(rankPercent)
+          };
+        });
         const groups = new Map();
 
-        rows.forEach((entry) => {
+        gradedRows.forEach((entry) => {
           const key = entry.type || "Unknown";
           if (!groups.has(key)) groups.set(key, []);
           groups.get(key).push(entry);
@@ -1930,6 +1940,7 @@
                       <th>Unit</th>
                       <th class="unit-value-num">Raw</th>
                       <th class="unit-value-num">Norm</th>
+                      <th class="unit-value-num">Grade</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1945,6 +1956,7 @@
                             </div>
                             <div class="unit-value-num">${normPct.toFixed(1)}%</div>
                           </td>
+                          <td class="unit-value-num"><span class="badge ${gradeClassForLetter(item.grade)}">${item.grade}</span></td>
                         </tr>
                       `;
                     }).join("")}
@@ -1958,7 +1970,6 @@
 
       const attackValuesHtml = renderGroupedValues(row.attackValues);
       const defenseValuesHtml = renderGroupedValues(row.defenseValues);
-      const sharedWeaponRange = row.weapon1RangeRaw || row.weapon2RangeRaw || "-";
 
       const weaponFieldPattern = /weapon\s*[12](?:\s*range)?/i;
       const coreStats = (Array.isArray(row.rawStats) ? row.rawStats : []).filter((x) => {
