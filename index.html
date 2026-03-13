@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.1";
+    window.APP_VERSION = "1.1.2";
   </script>
   <style>
     :root {
@@ -569,6 +569,25 @@
 
     .unit-value-table tr:last-child td {
       border-bottom: 0;
+    }
+
+    .unit-value-row.grade-s { background: #f3e8ff; }
+    .unit-value-row.grade-a { background: #e0e7ff; }
+    .unit-value-row.grade-b { background: #dbeafe; }
+    .unit-value-row.grade-c { background: #dcfce7; }
+    .unit-value-row.grade-d { background: #fef9c3; }
+    .unit-value-row.grade-f { background: #fee2e2; }
+
+    .unit-grade-pill {
+      display: inline-block;
+      min-width: 24px;
+      text-align: center;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      line-height: 1.1;
+      border: 1px solid currentColor;
     }
 
     .unit-value-num {
@@ -1946,8 +1965,9 @@
                   <tbody>
                     ${items.map((item) => {
                       const normPct = globalMax > 0 ? (item.value / globalMax) * 100 : 0;
+                      const gradeClass = gradeClassForLetter(item.grade);
                       return `
-                        <tr>
+                        <tr class="unit-value-row ${gradeClass}">
                           <td class="unit-value-name">${escapeHtml(item.unit)}</td>
                           <td class="unit-value-num">${fmt(item.value)}%</td>
                           <td>
@@ -1956,7 +1976,7 @@
                             </div>
                             <div class="unit-value-num">${normPct.toFixed(1)}%</div>
                           </td>
-                          <td class="unit-value-num"><span class="badge ${gradeClassForLetter(item.grade)}">${item.grade}</span></td>
+                          <td class="unit-value-num"><span class="unit-grade-pill ${gradeClass}">${item.grade}</span></td>
                         </tr>
                       `;
                     }).join("")}
