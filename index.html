@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.0";
+    window.APP_VERSION = "1.1.1";
   </script>
   <style>
     :root {
@@ -1970,6 +1970,7 @@
 
       const attackValuesHtml = renderGroupedValues(row.attackValues);
       const defenseValuesHtml = renderGroupedValues(row.defenseValues);
+      const sharedWeaponRange = row.weapon1RangeRaw || row.weapon2RangeRaw || "-";
 
       const weaponFieldPattern = /weapon\s*[12](?:\s*range)?/i;
       const coreStats = (Array.isArray(row.rawStats) ? row.rawStats : []).filter((x) => {
