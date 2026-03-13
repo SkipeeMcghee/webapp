@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.17";
+    window.APP_VERSION = "1.1.18";
   </script>
   <style>
     :root {
@@ -901,6 +901,7 @@
                 <th data-sort-key="endurance">Endurance</th>
                 <th data-sort-key="vision">Vision</th>
                 <th data-sort-key="utility">Utility</th>
+                <th data-sort-key="value">Value</th>
                 <th data-sort-key="total">Total</th>
               </tr>
             </thead>
@@ -1657,6 +1658,8 @@
         }
       }
 
+      const maxUnitCost = Math.max(...units.map((u) => Math.max(u.cost, 0)), 1);
+
       const rows = units.map((u) => {
         const rowDamage = damageMap.get(u.key) ?? new Map();
 
@@ -1739,6 +1742,19 @@
         const ammoFlexRaw = average([ammo1Util, ammo2Util]);
 
         const utilityRaw = u.abilityScore.utility + u.transportScore.utility + ammoFlexRaw;
+        const affordabilityRaw = u.cost > 0 ? Math.max(0, 1 - (u.cost / maxUnitCost)) : 0;
+        const higherCostTargets = positiveDamages.filter((x) => x.cost > u.cost && x.cost > 0);
+        const totalHigherCostTargets = defenders.filter((d) => d.cost > u.cost && d.cost > 0).length;
+        const higherCostCoverage = totalHigherCostTargets > 0
+          ? higherCostTargets.length / totalHigherCostTargets
+          : 0;
+        const higherCostTempoRaw = higherCostTargets.length
+          ? average(higherCostTargets.map((x) => {
+            const premiumRatio = (x.cost - u.cost) / Math.max(x.cost, 1);
+            return (x.dmg / 100) * Math.max(0, premiumRatio);
+          }))
+          : 0;
+        const valueRaw = (affordabilityRaw * 0.45) + (higherCostTempoRaw * 0.55);
 
         const specialKey = normalizeKey(u.special);
         let role = "Frontline";
@@ -1773,6 +1789,10 @@
           enduranceRaw,
           fogVisionRaw,
           utilityRaw,
+          valueRaw,
+          valueAffordabilityRaw: affordabilityRaw,
+          valueHigherCostTempoRaw: higherCostTempoRaw,
+          valueHigherCostCoverage: higherCostCoverage,
           utilityNotes: [...u.abilityScore.hits, ...u.transportScore.hits].join(", ") || "-",
           attackValues,
           defenseValues,
@@ -1786,7 +1806,8 @@
         "threatRaw",
         "enduranceRaw",
         "fogVisionRaw",
-        "utilityRaw"
+        "utilityRaw",
+        "valueRaw"
       ];
 
       const maxima = Object.fromEntries(
@@ -1800,21 +1821,23 @@
         const endurance = toPercentScale(r.enduranceRaw, maxima.enduranceRaw);
         const vision = toPercentScale(r.fogVisionRaw, maxima.fogVisionRaw);
         const utility = toPercentScale(r.utilityRaw, maxima.utilityRaw);
+        const value = toPercentScale(r.valueRaw, maxima.valueRaw);
 
         let weights = {
-          combat: 0.5,
-          threat: 0.2,
+          combat: 0.4,
+          threat: 0.15,
           endurance: 0.1,
           vision: 0.05,
-          utility: 0.15
+          utility: 0.15,
+          value: 0.15
         };
 
         if (r.role === "Indirect") {
-          weights = { combat: 0.45, threat: 0.3, endurance: 0.1, vision: 0.05, utility: 0.1 };
+          weights = { combat: 0.38, threat: 0.22, endurance: 0.08, vision: 0.05, utility: 0.1, value: 0.17 };
         } else if (r.role === "Objective") {
-          weights = { combat: 0.35, threat: 0.15, endurance: 0.1, vision: 0.05, utility: 0.35 };
+          weights = { combat: 0.28, threat: 0.12, endurance: 0.08, vision: 0.05, utility: 0.3, value: 0.17 };
         } else if (r.role === "Support") {
-          weights = { combat: 0.2, threat: 0.15, endurance: 0.15, vision: 0.1, utility: 0.4 };
+          weights = { combat: 0.15, threat: 0.1, endurance: 0.15, vision: 0.1, utility: 0.35, value: 0.15 };
         }
 
         const total =
@@ -1822,7 +1845,8 @@
           threat * weights.threat +
           endurance * weights.endurance +
           vision * weights.vision +
-          utility * weights.utility;
+          utility * weights.utility +
+          value * weights.value;
 
         return {
           ...r,
@@ -1832,11 +1856,12 @@
           endurance: clamp100(endurance),
           vision: clamp100(vision),
           utility: clamp100(utility),
+          value: clamp100(value),
           total: clamp100(total)
         };
       });
 
-      const metricKeys = ["combat", "durability", "threat", "endurance", "vision", "utility", "total"];
+      const metricKeys = ["combat", "durability", "threat", "endurance", "vision", "utility", "value", "total"];
       const gradeMaps = Object.fromEntries(metricKeys.map((k) => [k, buildMetricGrades(scored, k)]));
 
       const enriched = scored.map((row) => ({
@@ -1847,6 +1872,7 @@
         enduranceGrade: gradeMaps.endurance.get(row.key),
         visionGrade: gradeMaps.vision.get(row.key),
         utilityGrade: gradeMaps.utility.get(row.key),
+        valueGrade: gradeMaps.value.get(row.key),
         totalGrade: gradeMaps.total.get(row.key)
       }));
 
@@ -1909,7 +1935,7 @@
       lines.push("");
       lines.push("Top 5 total-score units:");
       r.summary.top5.forEach((u, i) => {
-        lines.push(`${i + 1}. ${u.unit} - total ${u.total.toFixed(1)} (${u.totalGrade}), combat ${u.combat.toFixed(1)} (${u.combatGrade}), threat ${u.threat.toFixed(1)} (${u.threatGrade}), endurance ${u.endurance.toFixed(1)} (${u.enduranceGrade}), vision ${u.vision.toFixed(1)} (${u.visionGrade}), utility ${u.utility.toFixed(1)} (${u.utilityGrade}).`);
+        lines.push(`${i + 1}. ${u.unit} - total ${u.total.toFixed(1)} (${u.totalGrade}), combat ${u.combat.toFixed(1)} (${u.combatGrade}), threat ${u.threat.toFixed(1)} (${u.threatGrade}), endurance ${u.endurance.toFixed(1)} (${u.enduranceGrade}), vision ${u.vision.toFixed(1)} (${u.visionGrade}), utility ${u.utility.toFixed(1)} (${u.utilityGrade}), value ${u.value.toFixed(1)} (${u.valueGrade}).`);
       });
       lines.push("");
       lines.push("Top 5 combat-exchange units:");
@@ -1998,6 +2024,7 @@
           <td class="${gradeClass(row.enduranceGrade)}">${row.endurance.toFixed(1)} (${escapeHtml(row.enduranceGrade)})</td>
           <td class="${gradeClass(row.visionGrade)}">${row.vision.toFixed(1)} (${escapeHtml(row.visionGrade)})</td>
           <td class="${gradeClass(row.utilityGrade)}">${row.utility.toFixed(1)} (${escapeHtml(row.utilityGrade)})</td>
+          <td class="${gradeClass(row.valueGrade)}">${row.value.toFixed(1)} (${escapeHtml(row.valueGrade)})</td>
           <td class="${gradeClass(row.totalGrade)}"><strong>${row.total.toFixed(1)} (${escapeHtml(row.totalGrade)})</strong></td>
         </tr>
       `).join("");
@@ -2106,7 +2133,8 @@
         ["Threat", `${fmt(row.threat)} (${row.threatGrade || "-"})`],
         ["Endurance", `${fmt(row.endurance)} (${row.enduranceGrade || "-"})`],
         ["Vision", `${fmt(row.vision)} (${row.visionGrade || "-"})`],
-        ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`]
+        ["Utility", `${fmt(row.utility)} (${row.utilityGrade || "-"})`],
+        ["Value", `${fmt(row.value)} (${row.valueGrade || "-"})`]
       ];
 
       const findRawStatValue = (patterns, fallback = "-") => {
@@ -2145,6 +2173,10 @@
         [
           "Utility",
           `Score ${fmt(row.utility)} (${row.utilityGrade || "-"})\nSpecials ${findRawStatValue(["special commands", "special", "commands"])}\nCarry ${findRawStatValue(["carry", "transport", "capacity", "cargo"])}\nNotes ${row.utilityNotes || "-"}`
+        ],
+        [
+          "Value",
+          `Score ${fmt(row.value)} (${row.valueGrade || "-"})\nCost ${Math.round(row.cost || 0)}\nHigher-cost tempo ${fmt((row.valueHigherCostTempoRaw || 0) * 100)}\nHigher-cost coverage ${fmt((row.valueHigherCostCoverage || 0) * 100)}%\nAffordability ${fmt((row.valueAffordabilityRaw || 0) * 100)}%`
         ]
       ];
 
@@ -2426,7 +2458,7 @@
     }
 
     function toggleSortForKey(key) {
-      const numericKeys = new Set(["combat", "durability", "threat", "endurance", "vision", "utility", "total"]);
+      const numericKeys = new Set(["combat", "durability", "threat", "endurance", "vision", "utility", "value", "total"]);
       const textKeys = new Set(["unit", "role"]);
       const isNumeric = numericKeys.has(key);
       const isText = textKeys.has(key);
