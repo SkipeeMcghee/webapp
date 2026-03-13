@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.7";
+    window.APP_VERSION = "1.1.8";
   </script>
   <style>
     :root {
@@ -572,17 +572,17 @@
     }
 
     .unit-value-row.grade-s,
-    .unit-value-row.grade-s td { background: #f3e8ff !important; }
+    .unit-value-row.grade-s td { background: #ddd6fe !important; }
     .unit-value-row.grade-a,
-    .unit-value-row.grade-a td { background: #dbeafe !important; }
+    .unit-value-row.grade-a td { background: #93c5fd !important; }
     .unit-value-row.grade-b,
-    .unit-value-row.grade-b td { background: #ccfbf1 !important; }
+    .unit-value-row.grade-b td { background: #99f6e4 !important; }
     .unit-value-row.grade-c,
-    .unit-value-row.grade-c td { background: #dcfce7 !important; }
+    .unit-value-row.grade-c td { background: #86efac !important; }
     .unit-value-row.grade-d,
-    .unit-value-row.grade-d td { background: #fef9c3 !important; }
+    .unit-value-row.grade-d td { background: #fde68a !important; }
     .unit-value-row.grade-f,
-    .unit-value-row.grade-f td { background: #fee2e2 !important; }
+    .unit-value-row.grade-f td { background: #fca5a5 !important; }
 
     .unit-grade-pill {
       display: inline-block;
@@ -695,12 +695,12 @@
       word-break: break-word;
     }
 
-    .grade-s { background: #f3e8ff; color: #6b21a8; }
-    .grade-a { background: #dbeafe; color: #1d4ed8; }
-    .grade-b { background: #ccfbf1; color: #0f766e; }
-    .grade-c { background: #dcfce7; color: #166534; }
-    .grade-d { background: #fef9c3; color: #854d0e; }
-    .grade-f { background: #fee2e2; color: #991b1b; }
+    .grade-s { background: #ddd6fe; color: #5b21b6; }
+    .grade-a { background: #93c5fd; color: #1d4ed8; }
+    .grade-b { background: #99f6e4; color: #0f766e; }
+    .grade-c { background: #86efac; color: #166534; }
+    .grade-d { background: #fde68a; color: #92400e; }
+    .grade-f { background: #fca5a5; color: #991b1b; }
 
     @media (max-width: 980px) {
       .uploader-grid { grid-template-columns: 1fr; }
@@ -1941,12 +1941,12 @@
         };
         const gradeBgForLetter = (grade) => {
           const g = String(grade || "").toUpperCase();
-          if (g === "S") return "#f3e8ff";
-          if (g === "A") return "#dbeafe";
-          if (g === "B") return "#ccfbf1";
-          if (g === "C") return "#dcfce7";
-          if (g === "D") return "#fef9c3";
-          return "#fee2e2";
+          if (g === "S") return "#ddd6fe";
+          if (g === "A") return "#93c5fd";
+          if (g === "B") return "#99f6e4";
+          if (g === "C") return "#86efac";
+          if (g === "D") return "#fde68a";
+          return "#fca5a5";
         };
 
         // Grade each value against the full roster for the same counterpart matchup.
