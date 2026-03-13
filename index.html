@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.13";
+    window.APP_VERSION = "1.1.14";
   </script>
   <style>
     :root {
@@ -215,6 +215,18 @@
       gap: 6px;
       grid-template-columns: auto 1fr;
       align-items: center;
+      cursor: pointer;
+      transition: 140ms ease;
+    }
+
+    .roster-unit-card:hover {
+      background: #f1f5f9;
+      border-color: #b9c8dd;
+    }
+
+    .roster-unit-card:focus-visible {
+      outline: 2px solid #60a5fa;
+      outline-offset: 2px;
     }
 
     .roster-unit-name {
@@ -2011,13 +2023,12 @@
           const icon = unitGlyph(row.unit).trim() || "???";
           const cost = Math.round(Number(row.cost) || 0);
           return `
-            <article class="roster-unit-card">
+            <article class="roster-unit-card" data-unit-key="${escapeHtml(row.key || "")}" role="button" tabindex="0" aria-label="Open ${escapeHtml(row.unit || "unit")} details">
               <span class="roster-icon">${escapeHtml(icon)}</span>
               <div>
                 <div class="roster-unit-name">${escapeHtml(row.unit || "-")}</div>
                 <div class="roster-unit-meta">
                   <span class="roster-chip">Cost ${cost}</span>
-                  <span class="roster-chip">${escapeHtml(row.role || "-")}</span>
                 </div>
               </div>
             </article>
@@ -2033,6 +2044,22 @@
       }).join("");
 
       rosterBody.innerHTML = html;
+      rosterBody.querySelectorAll("[data-unit-key]").forEach((card) => {
+        const selectUnit = () => {
+          const key = card.getAttribute("data-unit-key") || "";
+          if (!key) return;
+          renderUnitDetail(key);
+          unitDetailSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        };
+
+        card.addEventListener("click", selectUnit);
+        card.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            selectUnit();
+          }
+        });
+      });
       rosterMeta.textContent = `${allRows.length} units grouped by deployment building, sorted by cost (low to high).`;
       rosterSection.style.display = "block";
     }
