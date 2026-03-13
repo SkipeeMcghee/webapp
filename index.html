@@ -6,7 +6,7 @@
   <title>Red Zone Unit Analyzer</title>
   <script>
     // Single source-of-truth app version.
-    window.APP_VERSION = "1.1.4";
+    window.APP_VERSION = "1.1.5";
   </script>
   <style>
     :root {
@@ -1936,6 +1936,9 @@
 
         // Grade each value against the full roster for the same counterpart matchup.
         const computeRosterGrade = (entry) => {
+          const value = Number(entry?.value) || 0;
+          if (value <= 0) return "F";
+
           const comparisonValues = (state.result?.rows || []).map((candidate) => {
             const sourceValues = mode === "defense" ? candidate.defenseValues : candidate.attackValues;
             const hit = (Array.isArray(sourceValues) ? sourceValues : []).find(
@@ -1946,10 +1949,21 @@
 
           if (!comparisonValues.length) return "F";
 
-          const greaterCount = comparisonValues.filter((v) => v > entry.value).length;
-          const rankPercent = comparisonValues.length <= 1
+          const positiveValues = comparisonValues.filter((v) => Number.isFinite(v) && v > 0);
+          if (!positiveValues.length) return "F";
+
+          const maxValue = Math.max(...positiveValues);
+          if (Math.abs(value - maxValue) < 1e-9) return "S";
+
+          // Deterministic ranking with tie stability: equal values share the same tier.
+          const uniqueSorted = Array.from(new Set(positiveValues.map((v) => Number(v.toFixed(6))))).sort((a, b) => b - a);
+          const roundedValue = Number(value.toFixed(6));
+          const rankIndex = uniqueSorted.indexOf(roundedValue);
+          if (rankIndex < 0) return "F";
+
+          const rankPercent = uniqueSorted.length <= 1
             ? 1
-            : 1 - greaterCount / (comparisonValues.length - 1);
+            : 1 - rankIndex / (uniqueSorted.length - 1);
 
           return gradeFromRankPercent(rankPercent);
         };
